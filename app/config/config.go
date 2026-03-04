@@ -11,6 +11,8 @@ type Config struct {
 	Database       DatabaseConfig
 	JWT            JWTConfig
 	Supabase       SupabaseConfig
+	Payment        PaymentConfig
+	Email          EmailConfig
 }
 
 type ServerConfig struct {
@@ -37,6 +39,20 @@ type SupabaseConfig struct {
 	Key    string
 }
 
+type PaymentConfig struct {
+	MidtransServerKey string
+	MidtransClientKey string
+	IsProduction      bool
+}
+
+type EmailConfig struct {
+	GmailAPIKey            string
+	GmailServiceAccountJSON string
+	FromEmail              string
+	FromName               string
+	IsEnabled              bool
+}
+
 func Load() *Config {
 	return &Config{
 		Server: ServerConfig{
@@ -58,6 +74,18 @@ func Load() *Config {
 		Supabase: SupabaseConfig{
 			URL:    getEnv("SUPABASE_URL", ""),
 			Key:    getEnv("SUPABASE_KEY", ""),
+		},
+		Payment: PaymentConfig{
+			MidtransServerKey: getEnv("MIDTRANS_SERVER_KEY", ""),
+			MidtransClientKey: getEnv("MIDTRANS_CLIENT_KEY", ""),
+			IsProduction:      getEnv("ENV", "development") == "production",
+		},
+		Email: EmailConfig{
+			GmailAPIKey:             getEnv("GMAIL_API_KEY", ""),
+			GmailServiceAccountJSON: getEnv("GMAIL_SERVICE_ACCOUNT_JSON", ""),
+			FromEmail:               getEnv("SMTP_FROM_EMAIL", "noreply@rentalcar.com"),
+			FromName:                getEnv("EMAIL_FROM_NAME", "Rental Car Service"),
+			IsEnabled:               getEnv("EMAIL_ENABLED", "false") == "true",
 		},
 	}
 }
