@@ -16,6 +16,7 @@ type TopUpRepository interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]model.TopUpTransaction, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
 	UpdatePaymentURL(ctx context.Context, id uuid.UUID, paymentURL string) error
+	Update(ctx context.Context, transaction *model.TopUpTransaction) error
 }
 
 type topUpRepository struct {
@@ -73,5 +74,11 @@ func (r *topUpRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status
 func (r *topUpRepository) UpdatePaymentURL(ctx context.Context, id uuid.UUID, paymentURL string) error {
 	query := `UPDATE top_up_transactions SET payment_url = $1, updated_at = $2 WHERE id = $3`
 	_, err := r.pool.Exec(ctx, query, paymentURL, time.Now(), id)
+	return err
+}
+
+func (r *topUpRepository) Update(ctx context.Context, transaction *model.TopUpTransaction) error {
+	query := `UPDATE top_up_transactions SET amount = $1, status = $2, payment_method = $3, payment_url = $4, updated_at = $5 WHERE id = $6`
+	_, err := r.pool.Exec(ctx, query, transaction.Amount, transaction.Status, transaction.PaymentMethod, transaction.PaymentURL, transaction.UpdatedAt, transaction.ID)
 	return err
 }
