@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS top_up_transactions (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- User sessions table for login state
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for performance optimization
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_cars_category ON cars(category);
@@ -63,3 +72,5 @@ CREATE INDEX IF NOT EXISTS idx_rental_histories_user_id ON rental_histories(user
 CREATE INDEX IF NOT EXISTS idx_rental_histories_car_id ON rental_histories(car_id);
 CREATE INDEX IF NOT EXISTS idx_rental_histories_status ON rental_histories(status);
 CREATE INDEX IF NOT EXISTS idx_top_up_transactions_user_id ON top_up_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);

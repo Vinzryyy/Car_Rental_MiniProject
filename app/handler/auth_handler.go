@@ -197,11 +197,18 @@ func (h *AuthHandler) RefreshToken(c echo.Context) error {
 // @Success 200 {object} dto.APIResponse
 // @Router /api/auth/logout [post]
 func (h *AuthHandler) Logout(c echo.Context) error {
-	// In a stateless JWT system, logout is handled client-side
-	// by removing the stored token. This endpoint confirms the logout action.
+	token := c.Get("token").(string)
+	if err := h.authService.Logout(c.Request().Context(), token); err != nil {
+		return c.JSON(http.StatusInternalServerError, dto.APIResponse{
+			Success: false,
+			Message: "failed to logout",
+			Error:   err.Error(),
+		})
+	}
+
 	return c.JSON(http.StatusOK, dto.APIResponse{
 		Success: true,
-		Message: "logout successful. Please remove your stored token.",
+		Message: "logout successful",
 	})
 }
 
