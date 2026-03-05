@@ -177,6 +177,19 @@ func (s *EmailService) SendRentalReminderEmail(ctx context.Context, toEmail, use
 	})
 }
 
+// SendPasswordResetEmail sends password reset email
+func (s *EmailService) SendPasswordResetEmail(ctx context.Context, toEmail, userName, resetLink string) error {
+	subject := "Password Reset Request"
+	body := s.getPasswordResetTemplate(userName, resetLink)
+
+	return s.SendEmail(ctx, EmailMessage{
+		To:      toEmail,
+		Subject: subject,
+		Body:    body,
+		IsHTML:  true,
+	})
+}
+
 // IsEnabled returns true if the email service is configured
 func (s *EmailService) IsEnabled() bool {
 	return s.isEnabled
@@ -414,4 +427,52 @@ func (s *EmailService) getRentalReminderTemplate(userName, carName, returnDate s
     </div>
 </body>
 </html>`, userName, carName, returnDate)
+}
+
+// getPasswordResetTemplate returns the password reset HTML template
+func (s *EmailService) getPasswordResetTemplate(userName, resetLink string) string {
+	return fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #FF5722; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .button { display: inline-block; padding: 12px 24px; background: #FF5722; color: white; text-decoration: none; border-radius: 4px; }
+        .warning { background: #fff3cd; padding: 15px; border-left: 4px solid #FF5722; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Password Reset Request</h1>
+        </div>
+        <div class="content">
+            <p>Dear %s,</p>
+            <p>We received a request to reset your password. Click the button below to reset it:</p>
+
+            <p style="text-align: center; margin: 30px 0;">
+                <a href="%s" class="button">Reset Password</a>
+            </p>
+
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #2196F3;">%s</p>
+
+            <div class="warning">
+                <strong>Important:</strong> This link will expire in 15 minutes.
+                If you didn't request this password reset, you can safely ignore this email.
+                Your password will remain unchanged.
+            </div>
+
+            <p>Best regards,<br>The Rental Car Team</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2024 Rental Car Service. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`, userName, resetLink, resetLink)
 }
