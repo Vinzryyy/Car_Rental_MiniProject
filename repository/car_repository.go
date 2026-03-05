@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"car_rental_miniproject/model"
@@ -41,13 +42,13 @@ func (r *carRepository) GetAll(ctx context.Context, category string, availableOn
 	argIndex := 1
 
 	if category != "" {
-		query += ` AND category = $` + string(rune('0'+argIndex))
+		query += fmt.Sprintf(" AND category = $%d", argIndex)
 		args = append(args, category)
 		argIndex++
 	}
 
 	if availableOnly {
-		query += ` AND availability = $` + string(rune('0'+argIndex)) + ` AND stock_availability > 0`
+		query += fmt.Sprintf(" AND availability = $%d AND stock_availability > 0", argIndex)
 		args = append(args, true)
 		argIndex++
 	}
@@ -96,9 +97,18 @@ func (r *carRepository) Delete(ctx context.Context, id uuid.UUID) error {
 
 func (r *carRepository) DecreaseStock(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE cars SET stock_availability = stock_availability - 1, 
-			  availability = (stock_availability - 1 > 0), updated_at = $2 WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id, time.Now())
-	return err
+			  availability = (stock_availability - 1 > 0), updated_at = $2 
+			  WHERE id = $1 AND stock_availability > 0`
+	result, err := r.pool.Exec(ctx, query, id, time.Now())
+	if err != nil {
+		return err
+	}
+	
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("car not available or out of stock")
+	}
+	
+	return nil
 }
 
 func (r *carRepository) IncreaseStock(ctx context.Context, id uuid.UUID) error {

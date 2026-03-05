@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"car_rental_miniproject/model"
@@ -55,9 +56,18 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User
 }
 
 func (r *userRepository) UpdateDeposit(ctx context.Context, id uuid.UUID, amount float64) error {
-	query := `UPDATE users SET deposit_amount = deposit_amount + $1, updated_at = $2 WHERE id = $3`
-	_, err := r.pool.Exec(ctx, query, amount, time.Now(), id)
-	return err
+	query := `UPDATE users SET deposit_amount = deposit_amount + $1, updated_at = $2 
+			  WHERE id = $3 AND (deposit_amount + $1) >= 0`
+	result, err := r.pool.Exec(ctx, query, amount, time.Now(), id)
+	if err != nil {
+		return err
+	}
+	
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("insufficient balance or user not found")
+	}
+	
+	return nil
 }
 
 func (r *userRepository) UpdatePassword(ctx context.Context, id uuid.UUID, password string) error {

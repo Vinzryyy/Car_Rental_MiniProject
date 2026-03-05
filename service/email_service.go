@@ -15,6 +15,7 @@ import (
 	"google.golang.org/api/option"
 )
 
+//go:embed templates/emails/*
 var emailTemplates embed.FS
 
 // EmailService handles sending emails via Gmail API

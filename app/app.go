@@ -84,7 +84,7 @@ func NewApp(cfg *config.Config) (*App, error) {
 	authHandler := handler.NewAuthHandler(authService, middleware.NewCustomValidator())
 	carHandler := handler.NewCarHandler(carService, middleware.NewCustomValidator())
 	rentalHandler := handler.NewRentalHandler(rentalService, topUpService, middleware.NewCustomValidator())
-	webhookHandler := handler.NewPaymentWebhookHandler(rentalService, topUpService, emailService)
+	webhookHandler := handler.NewPaymentWebhookHandler(rentalService, topUpService, paymentService, emailService)
 
 	// Setup routes
 	setupRoutes(e, authHandler, carHandler, rentalHandler, jwtMiddleware, webhookHandler)

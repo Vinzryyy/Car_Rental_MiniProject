@@ -59,7 +59,7 @@ func (s *topUpService) CreateTopUp(ctx context.Context, userID uuid.UUID, req dt
 	}
 
 	// Generate payment invoice URL using Xendit
-	orderID := fmt.Sprintf("TOPUP-%s-%s", transaction.ID.String()[:8], time.Now().Format("20060102"))
+	orderID := fmt.Sprintf("TOPUP-%s", transaction.ID.String())
 	description := fmt.Sprintf("Deposit top-up for account %s", user.Email)
 	paymentURL, err := s.paymentService.CreateInvoice(ctx, orderID, req.Amount, user.Email, description)
 	if err != nil {

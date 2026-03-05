@@ -68,7 +68,7 @@ func Load() *Config {
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		JWT: JWTConfig{
-			Secret:     getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+			Secret:     getEnv("JWT_SECRET", ""),
 			Expiration: getEnvInt("JWT_EXPIRATION", 24),
 		},
 		Supabase: SupabaseConfig{

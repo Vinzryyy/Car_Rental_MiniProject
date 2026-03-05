@@ -2,26 +2,30 @@ package handler
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 
 	"car_rental_miniproject/app/dto"
 	"car_rental_miniproject/service"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
 type PaymentWebhookHandler struct {
-	rentalService service.RentalService
-	topUpService  service.TopUpService
-	emailService  *service.EmailService
+	rentalService  service.RentalService
+	topUpService   service.TopUpService
+	paymentService *service.XenditPaymentService
+	emailService   *service.EmailService
 }
 
-func NewPaymentWebhookHandler(rentalService service.RentalService, topUpService service.TopUpService, emailService *service.EmailService) *PaymentWebhookHandler {
+func NewPaymentWebhookHandler(rentalService service.RentalService, topUpService service.TopUpService, paymentService *service.XenditPaymentService, emailService *service.EmailService) *PaymentWebhookHandler {
 	return &PaymentWebhookHandler{
-		rentalService: rentalService,
-		topUpService:  topUpService,
-		emailService:  emailService,
+		rentalService:  rentalService,
+		topUpService:   topUpService,
+		paymentService: paymentService,
+		emailService:   emailService,
 	}
 }
 
@@ -36,6 +40,8 @@ func NewPaymentWebhookHandler(rentalService service.RentalService, topUpService 
 // @Failure 400 {object} dto.APIResponse
 // @Router /api/webhook/payment [post]
 func (h *PaymentWebhookHandler) PaymentNotification(c echo.Context) error {
+	callbackToken := c.Request().Header.Get("x-callback-token")
+	
 	var notification service.PaymentNotification
 	if err := c.Bind(&notification); err != nil {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
@@ -45,18 +51,26 @@ func (h *PaymentWebhookHandler) PaymentNotification(c echo.Context) error {
 		})
 	}
 
+	// Verify callback token
+	if !h.paymentService.VerifyPaymentNotification(c.Request().Context(), notification.OrderID, callbackToken) {
+		return c.JSON(http.StatusUnauthorized, dto.APIResponse{
+			Success: false,
+			Message: "unauthorized callback token",
+		})
+	}
+
 	// Extract entity type and ID from order_id
-	// Format: RENTAL-{id}-{date} or TOPUP-{id}-{date}
+	// Format: RENTAL-{uuid} or TOPUP-{uuid}
 	orderID := notification.OrderID
 	var entityType string
-	var entityID string
+	var entityIDStr string
 
 	if strings.HasPrefix(orderID, "RENTAL-") {
 		entityType = "rental"
-		entityID = strings.Split(strings.TrimPrefix(orderID, "RENTAL-"), "-")[0]
+		entityIDStr = strings.TrimPrefix(orderID, "RENTAL-")
 	} else if strings.HasPrefix(orderID, "TOPUP-") {
 		entityType = "topup"
-		entityID = strings.Split(strings.TrimPrefix(orderID, "TOPUP-"), "-")[0]
+		entityIDStr = strings.TrimPrefix(orderID, "TOPUP-")
 	} else {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
 			Success: false,
@@ -64,28 +78,46 @@ func (h *PaymentWebhookHandler) PaymentNotification(c echo.Context) error {
 		})
 	}
 
+	entityID, err := uuid.Parse(entityIDStr)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, dto.APIResponse{
+			Success: false,
+			Message: "invalid ID in order ID",
+			Error:   err.Error(),
+		})
+	}
+
 	// Process based on transaction status
 	switch notification.TransactionStatus {
-	case "capture", "settlement":
+	case "PAID", "SETTLED", "capture", "settlement":
 		// Payment successful
 		if entityType == "rental" {
 			// Confirm rental payment
-			// Note: In production, parse the UUID properly
-			_ = entityID
-			// h.rentalService.ConfirmPayment(ctx, rentalID)
+			// Note: For webhook, we skip the userID check by passing the rental's owner ID
+			rental, err := h.rentalService.GetRentalByID(c.Request().Context(), entityID)
+			if err != nil {
+				log.Printf("Webhook error: rental %s not found: %v", entityID, err)
+			} else {
+				err = h.rentalService.ConfirmPayment(c.Request().Context(), entityID, rental.UserID)
+				if err != nil {
+					log.Printf("Webhook error: failed to confirm rental %s: %v", entityID, err)
+				}
+			}
 		} else if entityType == "topup" {
 			// Confirm top-up payment
-			// Note: In production, parse the UUID properly
-			_ = entityID
-			// h.topUpService.ConfirmTopUp(ctx, transactionID)
+			err = h.topUpService.ConfirmTopUp(c.Request().Context(), entityID)
+			if err != nil {
+				log.Printf("Webhook error: failed to confirm top-up %s: %v", entityID, err)
+			}
 		}
 
 		// Send payment confirmation email (non-blocking)
 		if h.emailService != nil && h.emailService.IsEnabled() {
 			go func() {
+				// In a real app, we'd fetch the user email here
 				_ = h.emailService.SendPaymentConfirmationEmail(
 					context.Background(),
-					"", // userEmail - would need to fetch from database
+					"customer@example.com", 
 					"Customer",
 					notification.OrderID,
 					notification.GrossAmount,
@@ -99,24 +131,23 @@ func (h *PaymentWebhookHandler) PaymentNotification(c echo.Context) error {
 			Message: "payment notification processed successfully",
 		})
 
-	case "pending":
-		// Payment is pending
+	case "PENDING":
 		return c.JSON(http.StatusOK, dto.APIResponse{
 			Success: true,
 			Message: "payment is pending",
 		})
 
-	case "deny", "expire", "cancel", "failure":
-		// Payment failed or cancelled
+	case "EXPIRED", "FAILED", "CANCELLED":
+		// Handle failure if needed (e.g., mark rental as cancelled)
 		return c.JSON(http.StatusOK, dto.APIResponse{
 			Success: true,
-			Message: "payment failed or cancelled",
+			Message: "payment failed or expired",
 		})
 
 	default:
-		return c.JSON(http.StatusBadRequest, dto.APIResponse{
-			Success: false,
-			Message: "unknown transaction status",
+		return c.JSON(http.StatusOK, dto.APIResponse{
+			Success: true,
+			Message: "received status: " + notification.TransactionStatus,
 		})
 	}
 }
