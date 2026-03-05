@@ -1,0 +1,116 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"car_rental_miniproject/app/dto"
+	"car_rental_miniproject/model"
+	"car_rental_miniproject/repository"
+
+	"github.com/google/uuid"
+)
+
+type TopUpService interface {
+	CreateTopUp(ctx context.Context, userID uuid.UUID, req dto.TopUpRequest) (*model.TopUpTransaction, error)
+	GetTopUpByID(ctx context.Context, id uuid.UUID) (*model.TopUpTransaction, error)
+	GetTopUpsByUserID(ctx context.Context, userID uuid.UUID) ([]model.TopUpTransaction, error)
+	ConfirmTopUp(ctx context.Context, transactionID uuid.UUID) error
+	CancelTopUp(ctx context.Context, transactionID uuid.UUID) error
+}
+
+type topUpService struct {
+	topUpRepo        repository.TopUpRepository
+	userRepo         repository.UserRepository
+	paymentService   *MidtransPaymentService
+	emailService     *EmailService
+}
+
+func NewTopUpService(topUpRepo repository.TopUpRepository, userRepo repository.UserRepository, paymentService *MidtransPaymentService, emailService *EmailService) TopUpService {
+	return &topUpService{
+		topUpRepo:      topUpRepo,
+		userRepo:       userRepo,
+		paymentService: paymentService,
+		emailService:   emailService,
+	}
+}
+
+func (s *topUpService) CreateTopUp(ctx context.Context, userID uuid.UUID, req dto.TopUpRequest) (*model.TopUpTransaction, error) {
+	// Get user email for payment
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	transaction := &model.TopUpTransaction{
+		ID:            uuid.New(),
+		UserID:        userID,
+		Amount:        req.Amount,
+		Status:        "pending",
+		PaymentMethod: "midtrans",
+		PaymentURL:    "",
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+
+	if err := s.topUpRepo.Create(ctx, transaction); err != nil {
+		return nil, err
+	}
+
+	// Generate payment URL using Midtrans
+	orderID := fmt.Sprintf("TOPUP-%s-%s", transaction.ID.String()[:8], time.Now().Format("20060102"))
+	paymentURL, err := s.paymentService.CreateSnapPayment(ctx, orderID, req.Amount, user.Email)
+	if err != nil {
+		// Continue without payment URL if gateway fails
+		paymentURL = ""
+	}
+
+	// Update transaction with payment URL
+	transaction.PaymentURL = paymentURL
+	if err := s.topUpRepo.Update(ctx, transaction); err != nil {
+		return nil, err
+	}
+
+	// Send top-up confirmation email (non-blocking)
+	if s.emailService != nil && s.emailService.IsEnabled() {
+		go func() {
+			_ = s.emailService.SendTopUpConfirmationEmail(
+				context.Background(),
+				user.Email,
+				user.Email,
+				req.Amount,
+				transaction.ID.String()[:8],
+			)
+		}()
+	}
+
+	return transaction, nil
+}
+
+func (s *topUpService) GetTopUpByID(ctx context.Context, id uuid.UUID) (*model.TopUpTransaction, error) {
+	return s.topUpRepo.GetByID(ctx, id)
+}
+
+func (s *topUpService) GetTopUpsByUserID(ctx context.Context, userID uuid.UUID) ([]model.TopUpTransaction, error) {
+	return s.topUpRepo.GetByUserID(ctx, userID)
+}
+
+func (s *topUpService) ConfirmTopUp(ctx context.Context, transactionID uuid.UUID) error {
+	transaction, err := s.topUpRepo.GetByID(ctx, transactionID)
+	if err != nil {
+		return err
+	}
+
+	// Update user deposit
+	if err := s.userRepo.UpdateDeposit(ctx, transaction.UserID, transaction.Amount); err != nil {
+		return err
+	}
+
+	// Update transaction status
+	return s.topUpRepo.UpdateStatus(ctx, transactionID, "completed")
+}
+
+func (s *topUpService) CancelTopUp(ctx context.Context, transactionID uuid.UUID) error {
+	return s.topUpRepo.UpdateStatus(ctx, transactionID, "cancelled")
+}
