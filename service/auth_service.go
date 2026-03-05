@@ -72,6 +72,7 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*m
 		Email:         req.Email,
 		Password:      string(hashedPassword),
 		DepositAmount: 0,
+		Role:          "user", // Default role
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
 	}
@@ -102,7 +103,7 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (string, 
 	}
 
 	// Generate JWT token
-	token, err := s.generateToken(user.ID, user.Email)
+	token, err := s.generateToken(user.ID, user.Email, user.Role)
 	if err != nil {
 		return "", nil, err
 	}
@@ -125,6 +126,7 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (string, 
 			ID:            user.ID.String(),
 			Email:         user.Email,
 			DepositAmount: user.DepositAmount,
+			Role:          user.Role,
 		},
 		ExpiresIn: s.cfg.Expiration,
 	}
@@ -177,10 +179,11 @@ func (s *authService) GetUserByID(ctx context.Context, id uuid.UUID) (*model.Use
 	return user, nil
 }
 
-func (s *authService) generateToken(userID uuid.UUID, email string) (string, error) {
+func (s *authService) generateToken(userID uuid.UUID, email string, role string) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID.String(),
 		"email":   email,
+		"role":    role,
 		"exp":     time.Now().Add(time.Hour * time.Duration(s.cfg.Expiration)).Unix(),
 		"iat":     time.Now().Unix(),
 	}

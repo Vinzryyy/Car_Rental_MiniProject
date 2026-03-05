@@ -113,6 +113,7 @@ type UserResponse struct {
 	ID            string  `json:"id"`
 	Email         string  `json:"email"`
 	DepositAmount float64 `json:"deposit_amount"`
+	Role          string  `json:"role"`
 }
 
 // CarResponse represents the car data in responses

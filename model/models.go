@@ -13,6 +13,7 @@ type User struct {
 	Email        string     `json:"email" db:"email"`
 	Password     string     `json:"-" db:"password"`
 	DepositAmount float64   `json:"deposit_amount" db:"deposit_amount"`
+	Role         string     `json:"role" db:"role"`
 	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
 }
