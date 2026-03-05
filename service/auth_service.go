@@ -28,9 +28,10 @@ var (
 type AuthService interface {
 	Register(ctx context.Context, req dto.RegisterRequest) (*model.User, error)
 	Login(ctx context.Context, req dto.LoginRequest) (string, *dto.LoginResponse, error)
-	ValidateToken(tokenString string) (uuid.UUID, error)
+	ValidateToken(ctx context.Context, tokenString string) (uuid.UUID, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error)
 	RefreshToken(ctx context.Context, refreshToken string) (string, *dto.LoginResponse, error)
+	Logout(ctx context.Context, token string) error
 	ForgotPassword(ctx context.Context, email string) (string, error)
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) error
@@ -39,13 +40,15 @@ type AuthService interface {
 
 type authService struct {
 	userRepo     repository.UserRepository
+	sessionRepo  repository.SessionRepository
 	cfg          *config.JWTConfig
 	emailService *EmailService
 }
 
-func NewAuthService(userRepo repository.UserRepository, cfg *config.JWTConfig, emailService *EmailService) AuthService {
+func NewAuthService(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, cfg *config.JWTConfig, emailService *EmailService) AuthService {
 	return &authService{
 		userRepo:     userRepo,
+		sessionRepo:  sessionRepo,
 		cfg:          cfg,
 		emailService: emailService,
 	}
@@ -104,6 +107,18 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (string, 
 		return "", nil, err
 	}
 
+	// Create session in database
+	session := &model.UserSession{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		Token:     token,
+		ExpiresAt: time.Now().Add(time.Hour * time.Duration(s.cfg.Expiration)),
+		CreatedAt: time.Now(),
+	}
+	if err := s.sessionRepo.Create(ctx, session); err != nil {
+		return "", nil, fmt.Errorf("failed to create session: %w", err)
+	}
+
 	response := &dto.LoginResponse{
 		Token: token,
 		User: dto.UserResponse{
@@ -117,7 +132,19 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (string, 
 	return token, response, nil
 }
 
-func (s *authService) ValidateToken(tokenString string) (uuid.UUID, error) {
+func (s *authService) ValidateToken(ctx context.Context, tokenString string) (uuid.UUID, error) {
+	// Check if token exists in database (login state)
+	session, err := s.sessionRepo.GetByToken(ctx, tokenString)
+	if err != nil {
+		return uuid.Nil, ErrInvalidToken
+	}
+
+	// Check if session has expired
+	if time.Now().After(session.ExpiresAt) {
+		_ = s.sessionRepo.DeleteByToken(ctx, tokenString)
+		return uuid.Nil, ErrTokenExpired
+	}
+
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
@@ -165,7 +192,7 @@ func (s *authService) generateToken(userID uuid.UUID, email string) (string, err
 // RefreshToken generates a new access token using a valid refresh token
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, *dto.LoginResponse, error) {
 	// Validate the refresh token
-	userID, err := s.ValidateToken(refreshToken)
+	userID, err := s.ValidateToken(ctx, refreshToken)
 	if err != nil {
 		return "", nil, ErrInvalidToken
 	}
@@ -182,6 +209,21 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 		return "", nil, err
 	}
 
+	// Create new session
+	session := &model.UserSession{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		Token:     newToken,
+		ExpiresAt: time.Now().Add(time.Hour * time.Duration(s.cfg.Expiration)),
+		CreatedAt: time.Now(),
+	}
+	if err := s.sessionRepo.Create(ctx, session); err != nil {
+		return "", nil, err
+	}
+
+	// Delete old session
+	_ = s.sessionRepo.DeleteByToken(ctx, refreshToken)
+
 	response := &dto.LoginResponse{
 		Token: newToken,
 		User: dto.UserResponse{
@@ -193,6 +235,10 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 	}
 
 	return newToken, response, nil
+}
+
+func (s *authService) Logout(ctx context.Context, token string) error {
+	return s.sessionRepo.DeleteByToken(ctx, token)
 }
 
 // ForgotPassword initiates password reset by generating a reset token and sending email
