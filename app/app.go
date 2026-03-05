@@ -130,9 +130,9 @@ func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *han
 	cars := api.Group("/cars")
 	cars.GET("", carHandler.GetAllCars)
 	cars.GET("/:id", carHandler.GetCarByID)
-	cars.POST("", carHandler.CreateCar, jwtMiddleware.Authenticate)
-	cars.PUT("/:id", carHandler.UpdateCar, jwtMiddleware.Authenticate)
-	cars.DELETE("/:id", carHandler.DeleteCar, jwtMiddleware.Authenticate)
+	cars.POST("", carHandler.CreateCar, jwtMiddleware.Authenticate, jwtMiddleware.AuthorizeRole("admin"))
+	cars.PUT("/:id", carHandler.UpdateCar, jwtMiddleware.Authenticate, jwtMiddleware.AuthorizeRole("admin"))
+	cars.DELETE("/:id", carHandler.DeleteCar, jwtMiddleware.Authenticate, jwtMiddleware.AuthorizeRole("admin"))
 
 	// Rental routes (protected)
 	rentals := api.Group("/rentals", jwtMiddleware.Authenticate)

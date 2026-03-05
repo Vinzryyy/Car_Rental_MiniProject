@@ -28,7 +28,7 @@ var (
 type AuthService interface {
 	Register(ctx context.Context, req dto.RegisterRequest) (*model.User, error)
 	Login(ctx context.Context, req dto.LoginRequest) (string, *dto.LoginResponse, error)
-	ValidateToken(ctx context.Context, tokenString string) (uuid.UUID, error)
+	ValidateToken(ctx context.Context, tokenString string) (uuid.UUID, string, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error)
 	RefreshToken(ctx context.Context, refreshToken string) (string, *dto.LoginResponse, error)
 	Logout(ctx context.Context, token string) error
@@ -134,17 +134,17 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (string, 
 	return token, response, nil
 }
 
-func (s *authService) ValidateToken(ctx context.Context, tokenString string) (uuid.UUID, error) {
+func (s *authService) ValidateToken(ctx context.Context, tokenString string) (uuid.UUID, string, error) {
 	// Check if token exists in database (login state)
 	session, err := s.sessionRepo.GetByToken(ctx, tokenString)
 	if err != nil {
-		return uuid.Nil, ErrInvalidToken
+		return uuid.Nil, "", ErrInvalidToken
 	}
 
 	// Check if session has expired
 	if time.Now().After(session.ExpiresAt) {
 		_ = s.sessionRepo.DeleteByToken(ctx, tokenString)
-		return uuid.Nil, ErrTokenExpired
+		return uuid.Nil, "", ErrTokenExpired
 	}
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -155,20 +155,25 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (uu
 	})
 
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, "", err
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return uuid.Nil, errors.New("invalid token claims")
+		return uuid.Nil, "", errors.New("invalid token claims")
 	}
 
 	userID, err := uuid.Parse(claims["user_id"].(string))
 	if err != nil {
-		return uuid.Nil, err
+		return uuid.Nil, "", err
 	}
 
-	return userID, nil
+	role, ok := claims["role"].(string)
+	if !ok {
+		role = "user" // Default fallback
+	}
+
+	return userID, role, nil
 }
 
 func (s *authService) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
@@ -195,7 +200,7 @@ func (s *authService) generateToken(userID uuid.UUID, email string, role string)
 // RefreshToken generates a new access token using a valid refresh token
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (string, *dto.LoginResponse, error) {
 	// Validate the refresh token
-	userID, err := s.ValidateToken(ctx, refreshToken)
+	userID, _, err := s.ValidateToken(ctx, refreshToken)
 	if err != nil {
 		return "", nil, ErrInvalidToken
 	}

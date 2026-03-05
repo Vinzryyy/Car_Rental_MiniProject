@@ -40,18 +40,44 @@ func (m *JWTMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		tokenString := parts[1]
-		userID, err := m.authService.ValidateToken(c.Request().Context(), tokenString)
+		userID, role, err := m.authService.ValidateToken(c.Request().Context(), tokenString)
 		if err != nil {
 			return c.JSON(http.StatusUnauthorized, map[string]string{
 				"error": "invalid or expired token",
 			})
 		}
 
-		// Set user ID in context for handlers to use
+		// Set user ID and role in context for handlers to use
 		c.Set("user_id", userID.String())
+		c.Set("role", role)
 		c.Set("token", tokenString)
 
 		return next(c)
+	}
+}
+
+// AuthorizeRole restricts access to specific roles
+func (m *JWTMiddleware) AuthorizeRole(roles ...string) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			userRole := c.Get("role").(string)
+			
+			authorized := false
+			for _, role := range roles {
+				if userRole == role {
+					authorized = true
+					break
+				}
+			}
+
+			if !authorized {
+				return c.JSON(http.StatusForbidden, map[string]string{
+					"error": "you do not have permission to access this resource",
+				})
+			}
+
+			return next(c)
+		}
 	}
 }
 
@@ -65,9 +91,10 @@ func (m *JWTMiddleware) OptionalAuth(next echo.HandlerFunc) echo.HandlerFunc {
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) == 2 && parts[0] == "Bearer" {
-			userID, err := m.authService.ValidateToken(c.Request().Context(), parts[1])
+			userID, role, err := m.authService.ValidateToken(c.Request().Context(), parts[1])
 			if err == nil {
 				c.Set("user_id", userID.String())
+				c.Set("role", role)
 				c.Set("token", parts[1])
 			}
 		}
