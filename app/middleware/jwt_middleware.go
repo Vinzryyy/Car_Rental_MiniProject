@@ -40,7 +40,7 @@ func (m *JWTMiddleware) Authenticate(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 
 		tokenString := parts[1]
-		userID, err := m.authService.ValidateToken(tokenString)
+		userID, err := m.authService.ValidateToken(c.Request().Context(), tokenString)
 		if err != nil {
 			return c.JSON(http.StatusUnauthorized, map[string]string{
 				"error": "invalid or expired token",
@@ -65,7 +65,7 @@ func (m *JWTMiddleware) OptionalAuth(next echo.HandlerFunc) echo.HandlerFunc {
 
 		parts := strings.Split(authHeader, " ")
 		if len(parts) == 2 && parts[0] == "Bearer" {
-			userID, err := m.authService.ValidateToken(parts[1])
+			userID, err := m.authService.ValidateToken(c.Request().Context(), parts[1])
 			if err == nil {
 				c.Set("user_id", userID.String())
 				c.Set("token", parts[1])
