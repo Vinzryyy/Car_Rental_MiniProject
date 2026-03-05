@@ -33,11 +33,11 @@ type rentalService struct {
 	rentalRepo     repository.RentalRepository
 	carRepo        repository.CarRepository
 	userRepo       repository.UserRepository
-	paymentService *MidtransPaymentService
+	paymentService *XenditPaymentService
 	emailService   *EmailService
 }
 
-func NewRentalService(rentalRepo repository.RentalRepository, carRepo repository.CarRepository, userRepo repository.UserRepository, paymentService *MidtransPaymentService, emailService *EmailService) RentalService {
+func NewRentalService(rentalRepo repository.RentalRepository, carRepo repository.CarRepository, userRepo repository.UserRepository, paymentService *XenditPaymentService, emailService *EmailService) RentalService {
 	return &rentalService{
 		rentalRepo:     rentalRepo,
 		carRepo:        carRepo,
@@ -96,9 +96,10 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 		return nil, err
 	}
 
-	// Generate payment URL using Midtrans
+	// Generate payment invoice URL using Xendit
 	orderID := fmt.Sprintf("RENTAL-%s-%s", rental.ID.String()[:8], time.Now().Format("20060102"))
-	paymentURL, err := s.paymentService.CreateSnapPayment(ctx, orderID, totalCost, user.Email)
+	description := fmt.Sprintf("Car rental payment for %s", car.Name)
+	paymentURL, err := s.paymentService.CreateInvoice(ctx, orderID, totalCost, user.Email, description)
 	if err != nil {
 		// Continue without payment URL if gateway fails
 		paymentURL = ""

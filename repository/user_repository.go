@@ -15,6 +15,8 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*model.User, error)
 	UpdateDeposit(ctx context.Context, id uuid.UUID, amount float64) error
+	UpdatePassword(ctx context.Context, id uuid.UUID, password string) error
+	Update(ctx context.Context, user *model.User) error
 }
 
 type userRepository struct {
@@ -55,5 +57,17 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User
 func (r *userRepository) UpdateDeposit(ctx context.Context, id uuid.UUID, amount float64) error {
 	query := `UPDATE users SET deposit_amount = deposit_amount + $1, updated_at = $2 WHERE id = $3`
 	_, err := r.pool.Exec(ctx, query, amount, time.Now(), id)
+	return err
+}
+
+func (r *userRepository) UpdatePassword(ctx context.Context, id uuid.UUID, password string) error {
+	query := `UPDATE users SET password = $1, updated_at = $2 WHERE id = $3`
+	_, err := r.pool.Exec(ctx, query, password, time.Now(), id)
+	return err
+}
+
+func (r *userRepository) Update(ctx context.Context, user *model.User) error {
+	query := `UPDATE users SET email = $1, deposit_amount = $2, updated_at = $3 WHERE id = $4`
+	_, err := r.pool.Exec(ctx, query, user.Email, user.DepositAmount, user.UpdatedAt, user.ID)
 	return err
 }

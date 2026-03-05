@@ -23,11 +23,11 @@ type TopUpService interface {
 type topUpService struct {
 	topUpRepo        repository.TopUpRepository
 	userRepo         repository.UserRepository
-	paymentService   *MidtransPaymentService
+	paymentService   *XenditPaymentService
 	emailService     *EmailService
 }
 
-func NewTopUpService(topUpRepo repository.TopUpRepository, userRepo repository.UserRepository, paymentService *MidtransPaymentService, emailService *EmailService) TopUpService {
+func NewTopUpService(topUpRepo repository.TopUpRepository, userRepo repository.UserRepository, paymentService *XenditPaymentService, emailService *EmailService) TopUpService {
 	return &topUpService{
 		topUpRepo:      topUpRepo,
 		userRepo:       userRepo,
@@ -48,7 +48,7 @@ func (s *topUpService) CreateTopUp(ctx context.Context, userID uuid.UUID, req dt
 		UserID:        userID,
 		Amount:        req.Amount,
 		Status:        "pending",
-		PaymentMethod: "midtrans",
+		PaymentMethod: "xendit",
 		PaymentURL:    "",
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -58,9 +58,10 @@ func (s *topUpService) CreateTopUp(ctx context.Context, userID uuid.UUID, req dt
 		return nil, err
 	}
 
-	// Generate payment URL using Midtrans
+	// Generate payment invoice URL using Xendit
 	orderID := fmt.Sprintf("TOPUP-%s-%s", transaction.ID.String()[:8], time.Now().Format("20060102"))
-	paymentURL, err := s.paymentService.CreateSnapPayment(ctx, orderID, req.Amount, user.Email)
+	description := fmt.Sprintf("Deposit top-up for account %s", user.Email)
+	paymentURL, err := s.paymentService.CreateInvoice(ctx, orderID, req.Amount, user.Email, description)
 	if err != nil {
 		// Continue without payment URL if gateway fails
 		paymentURL = ""

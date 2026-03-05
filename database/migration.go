@@ -60,3 +60,4 @@ func (d *Database) SeedData() error {
 	log.Println("Database seeded successfully")
 	return nil
 }
+

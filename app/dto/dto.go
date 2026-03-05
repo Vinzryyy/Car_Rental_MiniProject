@@ -22,6 +22,38 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required"`
 }
 
+// RefreshTokenRequest represents the refresh token request
+// @Description Request to refresh JWT token
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+// ForgotPasswordRequest represents the forgot password request
+// @Description Request to reset password
+type ForgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+// ResetPasswordRequest represents the reset password request
+// @Description Request to set new password with reset token
+type ResetPasswordRequest struct {
+	Token       string `json:"token" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
+}
+
+// ChangePasswordRequest represents the change password request for authenticated users
+// @Description Request to change password for authenticated user
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
+}
+
+// UpdateProfileRequest represents the profile update request
+// @Description Request to update user profile
+type UpdateProfileRequest struct {
+	Email string `json:"email" validate:"omitempty,email"`
+}
+
 // TopUpRequest represents the deposit top-up request
 // @Description Request to add funds to user deposit
 type TopUpRequest struct {

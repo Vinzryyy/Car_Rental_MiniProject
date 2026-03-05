@@ -1,9 +1,12 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"embed"
 	"encoding/base64"
 	"fmt"
+	"html/template"
 	"net/mail"
 
 	"car_rental_miniproject/app/config"
@@ -12,12 +15,16 @@ import (
 	"google.golang.org/api/option"
 )
 
+//go:embed templates/emails/*.html
+var emailTemplates embed.FS
+
 // EmailService handles sending emails via Gmail API
 type EmailService struct {
 	gmailService *gmail.Service
 	fromEmail    string
 	fromName     string
 	isEnabled    bool
+	templates    map[string]*template.Template
 }
 
 // EmailMessage represents an email message to be sent
@@ -26,6 +33,44 @@ type EmailMessage struct {
 	Subject string
 	Body    string
 	IsHTML  bool
+}
+
+// Template data structures
+type WelcomeEmailData struct {
+	UserName string
+}
+
+type BookingConfirmationData struct {
+	UserName    string
+	CarName     string
+	RentalDate  string
+	TotalCost   float64
+	PaymentURL  string
+}
+
+type PaymentConfirmationData struct {
+	UserName    string
+	OrderID     string
+	Amount      float64
+	Status      string
+	StatusColor string
+}
+
+type TopUpConfirmationData struct {
+	UserName      string
+	Amount        float64
+	TransactionID string
+}
+
+type RentalReminderData struct {
+	UserName   string
+	CarName    string
+	ReturnDate string
+}
+
+type PasswordResetData struct {
+	UserName  string
+	ResetLink string
 }
 
 // NewEmailService creates a new Gmail API email service
@@ -66,12 +111,63 @@ func NewEmailService(cfg *config.Config) *EmailService {
 		fromName = "Rental Car Service"
 	}
 
+	// Load email templates
+	templates := loadEmailTemplates()
+
 	return &EmailService{
 		gmailService: gmailSvc,
 		fromEmail:    fromEmail,
 		fromName:     fromName,
 		isEnabled:    isEnabled,
+		templates:    templates,
 	}
+}
+
+// loadEmailTemplates loads all email templates from the embedded filesystem
+func loadEmailTemplates() map[string]*template.Template {
+	templates := make(map[string]*template.Template)
+	
+	templateFiles := []string{
+		"welcome.html",
+		"booking-confirmation.html",
+		"payment-confirmation.html",
+		"topup-confirmation.html",
+		"rental-reminder.html",
+		"password-reset.html",
+	}
+
+	for _, file := range templateFiles {
+		content, err := emailTemplates.ReadFile("templates/emails/" + file)
+		if err != nil {
+			continue // Skip if template not found
+		}
+
+		tmpl, err := template.New(file).Parse(string(content))
+		if err != nil {
+			continue // Skip if template parsing fails
+		}
+
+		// Store template by name (without .html extension)
+		name := file[:len(file)-5]
+		templates[name] = tmpl
+	}
+
+	return templates
+}
+
+// renderTemplate renders a template with the given data
+func (s *EmailService) renderTemplate(name string, data interface{}) (string, error) {
+	tmpl, ok := s.templates[name]
+	if !ok {
+		return "", fmt.Errorf("template %s not found", name)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
 
 // SendEmail sends an email using Gmail API
@@ -115,7 +211,13 @@ func (s *EmailService) SendEmail(ctx context.Context, msg EmailMessage) error {
 // SendWelcomeEmail sends a welcome email after user registration
 func (s *EmailService) SendWelcomeEmail(ctx context.Context, toEmail, userName string) error {
 	subject := "Welcome to Rental Car Service!"
-	body := s.getWelcomeEmailTemplate(userName)
+	
+	body, err := s.renderTemplate("welcome", WelcomeEmailData{
+		UserName: userName,
+	})
+	if err != nil {
+		return err
+	}
 
 	return s.SendEmail(ctx, EmailMessage{
 		To:      toEmail,
@@ -128,7 +230,17 @@ func (s *EmailService) SendWelcomeEmail(ctx context.Context, toEmail, userName s
 // SendBookingConfirmationEmail sends booking confirmation email
 func (s *EmailService) SendBookingConfirmationEmail(ctx context.Context, toEmail, userName, carName, rentalDate string, totalCost float64, paymentURL string) error {
 	subject := "Booking Confirmation - " + carName
-	body := s.getBookingConfirmationTemplate(userName, carName, rentalDate, totalCost, paymentURL)
+	
+	body, err := s.renderTemplate("booking-confirmation", BookingConfirmationData{
+		UserName:   userName,
+		CarName:    carName,
+		RentalDate: rentalDate,
+		TotalCost:  totalCost,
+		PaymentURL: paymentURL,
+	})
+	if err != nil {
+		return err
+	}
 
 	return s.SendEmail(ctx, EmailMessage{
 		To:      toEmail,
@@ -141,7 +253,22 @@ func (s *EmailService) SendBookingConfirmationEmail(ctx context.Context, toEmail
 // SendPaymentConfirmationEmail sends payment confirmation email
 func (s *EmailService) SendPaymentConfirmationEmail(ctx context.Context, toEmail, userName, orderID string, amount float64, status string) error {
 	subject := "Payment Confirmation - " + orderID
-	body := s.getPaymentConfirmationTemplate(userName, orderID, amount, status)
+	
+	statusColor := "#4CAF50"
+	if status != "completed" && status != "settlement" {
+		statusColor = "#FF9800"
+	}
+	
+	body, err := s.renderTemplate("payment-confirmation", PaymentConfirmationData{
+		UserName:    userName,
+		OrderID:     orderID,
+		Amount:      amount,
+		Status:      status,
+		StatusColor: statusColor,
+	})
+	if err != nil {
+		return err
+	}
 
 	return s.SendEmail(ctx, EmailMessage{
 		To:      toEmail,
@@ -154,7 +281,15 @@ func (s *EmailService) SendPaymentConfirmationEmail(ctx context.Context, toEmail
 // SendTopUpConfirmationEmail sends deposit top-up confirmation email
 func (s *EmailService) SendTopUpConfirmationEmail(ctx context.Context, toEmail, userName string, amount float64, transactionID string) error {
 	subject := "Deposit Top-Up Confirmation"
-	body := s.getTopUpConfirmationTemplate(userName, amount, transactionID)
+	
+	body, err := s.renderTemplate("topup-confirmation", TopUpConfirmationData{
+		UserName:      userName,
+		Amount:        amount,
+		TransactionID: transactionID,
+	})
+	if err != nil {
+		return err
+	}
 
 	return s.SendEmail(ctx, EmailMessage{
 		To:      toEmail,
@@ -167,7 +302,15 @@ func (s *EmailService) SendTopUpConfirmationEmail(ctx context.Context, toEmail, 
 // SendRentalReminderEmail sends rental reminder email
 func (s *EmailService) SendRentalReminderEmail(ctx context.Context, toEmail, userName, carName, returnDate string) error {
 	subject := "Rental Reminder - Return Your " + carName
-	body := s.getRentalReminderTemplate(userName, carName, returnDate)
+	
+	body, err := s.renderTemplate("rental-reminder", RentalReminderData{
+		UserName:   userName,
+		CarName:    carName,
+		ReturnDate: returnDate,
+	})
+	if err != nil {
+		return err
+	}
 
 	return s.SendEmail(ctx, EmailMessage{
 		To:      toEmail,
@@ -180,7 +323,14 @@ func (s *EmailService) SendRentalReminderEmail(ctx context.Context, toEmail, use
 // SendPasswordResetEmail sends password reset email
 func (s *EmailService) SendPasswordResetEmail(ctx context.Context, toEmail, userName, resetLink string) error {
 	subject := "Password Reset Request"
-	body := s.getPasswordResetTemplate(userName, resetLink)
+	
+	body, err := s.renderTemplate("password-reset", PasswordResetData{
+		UserName:  userName,
+		ResetLink: resetLink,
+	})
+	if err != nil {
+		return err
+	}
 
 	return s.SendEmail(ctx, EmailMessage{
 		To:      toEmail,
@@ -203,276 +353,4 @@ func (s *EmailService) GetFromEmail() string {
 // parseEmailAddress validates and parses an email address
 func parseEmailAddress(email string) (*mail.Address, error) {
 	return mail.ParseAddress(email)
-}
-
-// getWelcomeEmailTemplate returns the welcome email HTML template
-func (s *EmailService) getWelcomeEmailTemplate(userName string) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #4CAF50; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .button { display: inline-block; padding: 12px 24px; background: #4CAF50; color: white; text-decoration: none; border-radius: 4px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Welcome to Rental Car Service!</h1>
-        </div>
-        <div class="content">
-            <p>Dear %s,</p>
-            <p>Thank you for registering with Rental Car Service! We're excited to have you on board.</p>
-            <p>You can now browse our collection of premium cars and book your perfect ride.</p>
-            <p style="text-align: center; margin: 30px 0;">
-                <a href="https://rentalcar.com/login" class="button">Start Browsing Cars</a>
-            </p>
-            <p>If you have any questions, feel free to contact our support team.</p>
-            <p>Best regards,<br>The Rental Car Team</p>
-        </div>
-        <div class="footer">
-            <p>&copy; 2024 Rental Car Service. All rights reserved.</p>
-        </div>
-    </div>
-</body>
-</html>`, userName)
-}
-
-// getBookingConfirmationTemplate returns the booking confirmation HTML template
-func (s *EmailService) getBookingConfirmationTemplate(userName, carName, rentalDate string, totalCost float64, paymentURL string) string {
-	paymentButton := ""
-	if paymentURL != "" {
-		paymentButton = fmt.Sprintf(`
-            <p style="text-align: center; margin: 30px 0;">
-                <a href="%s" class="button">Complete Payment</a>
-            </p>
-            <p><strong>Note:</strong> Your booking will be confirmed once payment is completed.</p>`, paymentURL)
-	}
-
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #2196F3; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .booking-details { background: white; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        .button { display: inline-block; padding: 12px 24px; background: #2196F3; color: white; text-decoration: none; border-radius: 4px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Booking Confirmation</h1>
-        </div>
-        <div class="content">
-            <p>Dear %s,</p>
-            <p>Your car rental booking has been received!</p>
-            
-            <div class="booking-details">
-                <h3>Booking Details:</h3>
-                <p><strong>Car:</strong> %s</p>
-                <p><strong>Rental Date:</strong> %s</p>
-                <p><strong>Total Cost:</strong> $%.2f</p>
-                <p><strong>Status:</strong> Pending Payment</p>
-            </div>
-            
-            %s
-            
-            <p>Thank you for choosing Rental Car Service!</p>
-            <p>Best regards,<br>The Rental Car Team</p>
-        </div>
-        <div class="footer">
-            <p>&copy; 2024 Rental Car Service. All rights reserved.</p>
-        </div>
-    </div>
-</body>
-</html>`, userName, carName, rentalDate, totalCost, paymentButton)
-}
-
-// getPaymentConfirmationTemplate returns the payment confirmation HTML template
-func (s *EmailService) getPaymentConfirmationTemplate(userName, orderID string, amount float64, status string) string {
-	statusColor := "#4CAF50"
-	if status != "completed" && status != "settlement" {
-		statusColor = "#FF9800"
-	}
-
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: %s; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .payment-details { background: white; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Payment Confirmation</h1>
-        </div>
-        <div class="content">
-            <p>Dear %s,</p>
-            <p>Your payment has been processed.</p>
-            
-            <div class="payment-details">
-                <h3>Payment Details:</h3>
-                <p><strong>Order ID:</strong> %s</p>
-                <p><strong>Amount:</strong> $%.2f</p>
-                <p><strong>Status:</strong> %s</p>
-            </div>
-            
-            <p>Thank you for your payment!</p>
-            <p>Best regards,<br>The Rental Car Team</p>
-        </div>
-        <div class="footer">
-            <p>&copy; 2024 Rental Car Service. All rights reserved.</p>
-        </div>
-    </div>
-</body>
-</html>`, statusColor, userName, orderID, amount, status)
-}
-
-// getTopUpConfirmationTemplate returns the top-up confirmation HTML template
-func (s *EmailService) getTopUpConfirmationTemplate(userName string, amount float64, transactionID string) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #9C27B0; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .topup-details { background: white; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        .button { display: inline-block; padding: 12px 24px; background: #9C27B0; color: white; text-decoration: none; border-radius: 4px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Deposit Top-Up Confirmation</h1>
-        </div>
-        <div class="content">
-            <p>Dear %s,</p>
-            <p>Your deposit top-up request has been received.</p>
-            
-            <div class="topup-details">
-                <h3>Top-Up Details:</h3>
-                <p><strong>Transaction ID:</strong> %s</p>
-                <p><strong>Amount:</strong> $%.2f</p>
-                <p><strong>Status:</strong> Pending Payment</p>
-            </div>
-            
-            <p>Your deposit balance will be updated once the payment is confirmed.</p>
-            <p>Best regards,<br>The Rental Car Team</p>
-        </div>
-        <div class="footer">
-            <p>&copy; 2024 Rental Car Service. All rights reserved.</p>
-        </div>
-    </div>
-</body>
-</html>`, userName, transactionID, amount)
-}
-
-// getRentalReminderTemplate returns the rental reminder HTML template
-func (s *EmailService) getRentalReminderTemplate(userName, carName, returnDate string) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #FF9800; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .reminder-details { background: white; padding: 15px; margin: 20px 0; border-radius: 4px; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Rental Reminder</h1>
-        </div>
-        <div class="content">
-            <p>Dear %s,</p>
-            <p>This is a friendly reminder about your car rental.</p>
-            
-            <div class="reminder-details">
-                <h3>Rental Details:</h3>
-                <p><strong>Car:</strong> %s</p>
-                <p><strong>Expected Return Date:</strong> %s</p>
-            </div>
-            
-            <p>Please ensure the car is returned on time to avoid any additional charges.</p>
-            <p>Best regards,<br>The Rental Car Team</p>
-        </div>
-        <div class="footer">
-            <p>&copy; 2024 Rental Car Service. All rights reserved.</p>
-        </div>
-    </div>
-</body>
-</html>`, userName, carName, returnDate)
-}
-
-// getPasswordResetTemplate returns the password reset HTML template
-func (s *EmailService) getPasswordResetTemplate(userName, resetLink string) string {
-	return fmt.Sprintf(`
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #FF5722; color: white; padding: 20px; text-align: center; }
-        .content { padding: 20px; background: #f9f9f9; }
-        .button { display: inline-block; padding: 12px 24px; background: #FF5722; color: white; text-decoration: none; border-radius: 4px; }
-        .warning { background: #fff3cd; padding: 15px; border-left: 4px solid #FF5722; margin: 20px 0; }
-        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Password Reset Request</h1>
-        </div>
-        <div class="content">
-            <p>Dear %s,</p>
-            <p>We received a request to reset your password. Click the button below to reset it:</p>
-
-            <p style="text-align: center; margin: 30px 0;">
-                <a href="%s" class="button">Reset Password</a>
-            </p>
-
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #2196F3;">%s</p>
-
-            <div class="warning">
-                <strong>Important:</strong> This link will expire in 15 minutes.
-                If you didn't request this password reset, you can safely ignore this email.
-                Your password will remain unchanged.
-            </div>
-
-            <p>Best regards,<br>The Rental Car Team</p>
-        </div>
-        <div class="footer">
-            <p>&copy; 2024 Rental Car Service. All rights reserved.</p>
-        </div>
-    </div>
-</body>
-</html>`, userName, resetLink, resetLink)
 }

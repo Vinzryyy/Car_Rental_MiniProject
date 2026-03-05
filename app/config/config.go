@@ -40,8 +40,8 @@ type SupabaseConfig struct {
 }
 
 type PaymentConfig struct {
-	MidtransServerKey string
-	MidtransClientKey string
+	XenditSecretKey string
+	XenditPublicKey string
 	IsProduction      bool
 }
 
@@ -76,8 +76,8 @@ func Load() *Config {
 			Key:    getEnv("SUPABASE_KEY", ""),
 		},
 		Payment: PaymentConfig{
-			MidtransServerKey: getEnv("MIDTRANS_SERVER_KEY", ""),
-			MidtransClientKey: getEnv("MIDTRANS_CLIENT_KEY", ""),
+			XenditSecretKey:   getEnv("XENDIT_SECRET_KEY", ""),
+			XenditPublicKey:   getEnv("XENDIT_PUBLIC_KEY", ""),
 			IsProduction:      getEnv("ENV", "development") == "production",
 		},
 		Email: EmailConfig{
