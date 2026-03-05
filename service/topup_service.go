@@ -103,6 +103,15 @@ func (s *topUpService) ConfirmTopUp(ctx context.Context, transactionID uuid.UUID
 		return err
 	}
 
+	// Idempotency check: if already completed or cancelled, return success
+	if transaction.Status == "completed" {
+		return nil
+	}
+	
+	if transaction.Status == "cancelled" {
+		return fmt.Errorf("cannot confirm a cancelled transaction")
+	}
+
 	// Update user deposit
 	if err := s.userRepo.UpdateDeposit(ctx, transaction.UserID, transaction.Amount); err != nil {
 		return err

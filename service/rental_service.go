@@ -200,6 +200,11 @@ func (s *rentalService) ConfirmPayment(ctx context.Context, rentalID uuid.UUID, 
 		return ErrUnauthorizedAccess
 	}
 
+	// Idempotency check: if already paid, return success
+	if rental.PaymentStatus == "paid" {
+		return nil
+	}
+
 	// Deduct deposit from user
 	if err := s.userRepo.UpdateDeposit(ctx, rental.UserID, -rental.TotalCost); err != nil {
 		return err
