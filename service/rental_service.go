@@ -26,6 +26,7 @@ type RentalService interface {
 	GetRentalsByUserID(ctx context.Context, userID uuid.UUID) ([]dto.RentalHistoryResponse, error)
 	GetBookingReport(ctx context.Context, userID uuid.UUID) (*dto.BookingReportResponse, error)
 	ConfirmPayment(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error
+	ConfirmExternalPayment(ctx context.Context, rentalID uuid.UUID) error
 	CancelRental(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error
 	ReturnCar(ctx context.Context, rentalID uuid.UUID) error
 }
@@ -213,6 +214,22 @@ func (s *rentalService) ConfirmPayment(ctx context.Context, rentalID uuid.UUID, 
 	}
 
 	// Update rental status
+	return s.rentalRepo.UpdateStatus(ctx, rentalID, "active", "paid")
+}
+
+func (s *rentalService) ConfirmExternalPayment(ctx context.Context, rentalID uuid.UUID) error {
+	rental, err := s.rentalRepo.GetByID(ctx, rentalID)
+	if err != nil {
+		return ErrRentalNotFound
+	}
+
+	// Idempotency check: if already paid, return success
+	if rental.PaymentStatus == "paid" {
+		return nil
+	}
+
+	// Update rental status WITHOUT deducting internal deposit
+	// This is for external payments (Xendit) where the money is already collected
 	return s.rentalRepo.UpdateStatus(ctx, rentalID, "active", "paid")
 }
 

@@ -92,16 +92,10 @@ func (h *PaymentWebhookHandler) PaymentNotification(c echo.Context) error {
 	case "PAID", "SETTLED", "capture", "settlement":
 		// Payment successful
 		if entityType == "rental" {
-			// Confirm rental payment
-			// Note: For webhook, we skip the userID check by passing the rental's owner ID
-			rental, err := h.rentalService.GetRentalByID(c.Request().Context(), entityID)
+			// Confirm rental payment via external gateway
+			err = h.rentalService.ConfirmExternalPayment(c.Request().Context(), entityID)
 			if err != nil {
-				log.Printf("Webhook error: rental %s not found: %v", entityID, err)
-			} else {
-				err = h.rentalService.ConfirmPayment(c.Request().Context(), entityID, rental.UserID)
-				if err != nil {
-					log.Printf("Webhook error: failed to confirm rental %s: %v", entityID, err)
-				}
+				log.Printf("Webhook error: failed to confirm rental %s: %v", entityID, err)
 			}
 		} else if entityType == "topup" {
 			// Confirm top-up payment
