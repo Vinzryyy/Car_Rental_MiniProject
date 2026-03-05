@@ -36,15 +36,16 @@ func NewApp(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
+	// Note: Migrations and seeding are skipped - manage schema via Supabase Dashboard
 	// Run migrations
-	if err := db.RunMigrations(); err != nil {
-		return nil, fmt.Errorf("failed to run migrations: %w", err)
-	}
+	// if err := db.RunMigrations(); err != nil {
+	// 	return nil, fmt.Errorf("failed to run migrations: %w", err)
+	// }
 
 	// Seed initial data
-	if err := db.SeedData(); err != nil {
-		log.Printf("Warning: failed to seed data: %v", err)
-	}
+	// if err := db.SeedData(); err != nil {
+	// 	log.Printf("Warning: failed to seed data: %v", err)
+	// }
 
 	// Initialize Echo
 	e := echo.New()

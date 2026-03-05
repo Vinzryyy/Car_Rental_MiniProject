@@ -17,6 +17,7 @@ var (
 	ErrRentalNotFound       = errors.New("rental not found")
 	ErrInsufficientDeposit  = errors.New("insufficient deposit")
 	ErrRentalAlreadyExists  = errors.New("rental already exists")
+	ErrUnauthorizedAccess   = errors.New("unauthorized access to this rental")
 )
 
 type RentalService interface {
@@ -24,8 +25,8 @@ type RentalService interface {
 	GetRentalByID(ctx context.Context, id uuid.UUID) (*model.RentalHistory, error)
 	GetRentalsByUserID(ctx context.Context, userID uuid.UUID) ([]dto.RentalHistoryResponse, error)
 	GetBookingReport(ctx context.Context, userID uuid.UUID) (*dto.BookingReportResponse, error)
-	ConfirmPayment(ctx context.Context, rentalID uuid.UUID) error
-	CancelRental(ctx context.Context, rentalID uuid.UUID) error
+	ConfirmPayment(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error
+	CancelRental(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error
 	ReturnCar(ctx context.Context, rentalID uuid.UUID) error
 }
 
@@ -188,10 +189,15 @@ func (s *rentalService) GetBookingReport(ctx context.Context, userID uuid.UUID) 
 	}, nil
 }
 
-func (s *rentalService) ConfirmPayment(ctx context.Context, rentalID uuid.UUID) error {
+func (s *rentalService) ConfirmPayment(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error {
 	rental, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
 		return ErrRentalNotFound
+	}
+
+	// Ownership check
+	if rental.UserID != userID {
+		return ErrUnauthorizedAccess
 	}
 
 	// Deduct deposit from user
@@ -203,10 +209,15 @@ func (s *rentalService) ConfirmPayment(ctx context.Context, rentalID uuid.UUID) 
 	return s.rentalRepo.UpdateStatus(ctx, rentalID, "active", "paid")
 }
 
-func (s *rentalService) CancelRental(ctx context.Context, rentalID uuid.UUID) error {
+func (s *rentalService) CancelRental(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error {
 	rental, err := s.rentalRepo.GetByID(ctx, rentalID)
 	if err != nil {
 		return ErrRentalNotFound
+	}
+
+	// Ownership check
+	if rental.UserID != userID {
+		return ErrUnauthorizedAccess
 	}
 
 	// Increase car stock back

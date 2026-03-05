@@ -288,6 +288,16 @@ func (h *RentalHandler) GetTopUpHistory(c echo.Context) error {
 // @Failure 404 {object} dto.APIResponse
 // @Router /api/rentals/:id/confirm-payment [post]
 func (h *RentalHandler) ConfirmPayment(c echo.Context) error {
+	userIDStr := c.Get("user_id").(string)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, dto.APIResponse{
+			Success: false,
+			Message: "invalid user ID",
+			Error:   err.Error(),
+		})
+	}
+
 	rentalID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
@@ -297,19 +307,27 @@ func (h *RentalHandler) ConfirmPayment(c echo.Context) error {
 		})
 	}
 
-	if err := h.rentalService.ConfirmPayment(c.Request().Context(), rentalID); err != nil {
-		if errors.Is(err, service.ErrRentalNotFound) {
+	if err := h.rentalService.ConfirmPayment(c.Request().Context(), rentalID, userID); err != nil {
+		switch {
+		case errors.Is(err, service.ErrRentalNotFound):
 			return c.JSON(http.StatusNotFound, dto.APIResponse{
 				Success: false,
 				Message: "rental not found",
 				Error:   err.Error(),
 			})
+		case errors.Is(err, service.ErrUnauthorizedAccess):
+			return c.JSON(http.StatusForbidden, dto.APIResponse{
+				Success: false,
+				Message: "you do not have permission to confirm this payment",
+				Error:   err.Error(),
+			})
+		default:
+			return c.JSON(http.StatusInternalServerError, dto.APIResponse{
+				Success: false,
+				Message: "failed to confirm payment",
+				Error:   err.Error(),
+			})
 		}
-		return c.JSON(http.StatusInternalServerError, dto.APIResponse{
-			Success: false,
-			Message: "failed to confirm payment",
-			Error:   err.Error(),
-		})
 	}
 
 	return c.JSON(http.StatusOK, dto.APIResponse{
@@ -331,6 +349,16 @@ func (h *RentalHandler) ConfirmPayment(c echo.Context) error {
 // @Failure 404 {object} dto.APIResponse
 // @Router /api/rentals/:id/cancel [post]
 func (h *RentalHandler) CancelRental(c echo.Context) error {
+	userIDStr := c.Get("user_id").(string)
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, dto.APIResponse{
+			Success: false,
+			Message: "invalid user ID",
+			Error:   err.Error(),
+		})
+	}
+
 	rentalID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
@@ -340,19 +368,27 @@ func (h *RentalHandler) CancelRental(c echo.Context) error {
 		})
 	}
 
-	if err := h.rentalService.CancelRental(c.Request().Context(), rentalID); err != nil {
-		if errors.Is(err, service.ErrRentalNotFound) {
+	if err := h.rentalService.CancelRental(c.Request().Context(), rentalID, userID); err != nil {
+		switch {
+		case errors.Is(err, service.ErrRentalNotFound):
 			return c.JSON(http.StatusNotFound, dto.APIResponse{
 				Success: false,
 				Message: "rental not found",
 				Error:   err.Error(),
 			})
+		case errors.Is(err, service.ErrUnauthorizedAccess):
+			return c.JSON(http.StatusForbidden, dto.APIResponse{
+				Success: false,
+				Message: "you do not have permission to cancel this rental",
+				Error:   err.Error(),
+			})
+		default:
+			return c.JSON(http.StatusInternalServerError, dto.APIResponse{
+				Success: false,
+				Message: "failed to cancel rental",
+				Error:   err.Error(),
+			})
 		}
-		return c.JSON(http.StatusInternalServerError, dto.APIResponse{
-			Success: false,
-			Message: "failed to cancel rental",
-			Error:   err.Error(),
-		})
 	}
 
 	return c.JSON(http.StatusOK, dto.APIResponse{
