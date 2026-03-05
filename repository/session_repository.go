@@ -45,13 +45,13 @@ func (r *sessionRepository) GetByToken(ctx context.Context, token string) (*mode
 
 func (r *sessionRepository) DeleteByToken(ctx context.Context, token string) error {
 	query := `DELETE FROM user_sessions WHERE token = $1`
-	_, err := r.pool.Exec(ctx, query, token)
+	_, err := r.pool.Exec(ctx, query, time.Now())
 	return err
 }
 
 func (r *sessionRepository) DeleteExpired(ctx context.Context) error {
 	query := `DELETE FROM user_sessions WHERE expires_at < $1`
-	_, err := r.pool.Exec(ctx, time.Now())
+	_, err := r.pool.Exec(ctx, query, time.Now())
 	return err
 }
 
