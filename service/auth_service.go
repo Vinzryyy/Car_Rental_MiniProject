@@ -207,7 +207,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 	}
 
 	// Generate new access token
-	newToken, err := s.generateToken(user.ID, user.Email)
+	newToken, err := s.generateToken(user.ID, user.Email, user.Role)
 	if err != nil {
 		return "", nil, err
 	}
@@ -233,6 +233,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (st
 			ID:            user.ID.String(),
 			Email:         user.Email,
 			DepositAmount: user.DepositAmount,
+			Role:          user.Role,
 		},
 		ExpiresIn: s.cfg.Expiration,
 	}
@@ -267,7 +268,7 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) (string,
 		}(user.Email, resetToken)
 	}
 
-	return "password reset token sent", nil
+	return resetToken, nil
 }
 
 // ResetPassword resets the user password using a valid reset token

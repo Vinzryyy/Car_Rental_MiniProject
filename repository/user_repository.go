@@ -29,16 +29,16 @@ func NewUserRepository(pool *pgxpool.Pool) UserRepository {
 }
 
 func (r *userRepository) Create(ctx context.Context, user *model.User) error {
-	query := `INSERT INTO users (id, email, password, deposit_amount, created_at, updated_at) 
-			  VALUES ($1, $2, $3, $4, $5, $6)`
-	_, err := r.pool.Exec(ctx, query, user.ID, user.Email, user.Password, user.DepositAmount, user.CreatedAt, user.UpdatedAt)
+	query := `INSERT INTO users (id, email, password, deposit_amount, role, created_at, updated_at) 
+			  VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	_, err := r.pool.Exec(ctx, query, user.ID, user.Email, user.Password, user.DepositAmount, user.Role, user.CreatedAt, user.UpdatedAt)
 	return err
 }
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
-	query := `SELECT id, email, password, deposit_amount, created_at, updated_at FROM users WHERE email = $1`
+	query := `SELECT id, email, password, deposit_amount, role, created_at, updated_at FROM users WHERE email = $1`
 	user := &model.User{}
-	err := r.pool.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, &user.Password, &user.DepositAmount, &user.CreatedAt, &user.UpdatedAt)
+	err := r.pool.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, &user.Password, &user.DepositAmount, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -46,9 +46,9 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*model.U
 }
 
 func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
-	query := `SELECT id, email, password, deposit_amount, created_at, updated_at FROM users WHERE id = $1`
+	query := `SELECT id, email, password, deposit_amount, role, created_at, updated_at FROM users WHERE id = $1`
 	user := &model.User{}
-	err := r.pool.QueryRow(ctx, query, id).Scan(&user.ID, &user.Email, &user.Password, &user.DepositAmount, &user.CreatedAt, &user.UpdatedAt)
+	err := r.pool.QueryRow(ctx, query, id).Scan(&user.ID, &user.Email, &user.Password, &user.DepositAmount, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (r *userRepository) UpdatePassword(ctx context.Context, id uuid.UUID, passw
 }
 
 func (r *userRepository) Update(ctx context.Context, user *model.User) error {
-	query := `UPDATE users SET email = $1, deposit_amount = $2, updated_at = $3 WHERE id = $4`
-	_, err := r.pool.Exec(ctx, query, user.Email, user.DepositAmount, user.UpdatedAt, user.ID)
+	query := `UPDATE users SET email = $1, deposit_amount = $2, role = $3, updated_at = $4 WHERE id = $5`
+	_, err := r.pool.Exec(ctx, query, user.Email, user.DepositAmount, user.Role, user.UpdatedAt, user.ID)
 	return err
 }

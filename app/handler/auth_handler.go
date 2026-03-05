@@ -76,6 +76,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 			ID:            user.ID.String(),
 			Email:         user.Email,
 			DepositAmount: user.DepositAmount,
+			Role:          user.Role,
 		},
 	})
 }
@@ -248,6 +249,7 @@ func (h *AuthHandler) Me(c echo.Context) error {
 			ID:            user.ID.String(),
 			Email:         user.Email,
 			DepositAmount: user.DepositAmount,
+			Role:          user.Role,
 		},
 	})
 }
@@ -473,6 +475,7 @@ func (h *AuthHandler) UpdateProfile(c echo.Context) error {
 			ID:            user.ID.String(),
 			Email:         user.Email,
 			DepositAmount: user.DepositAmount,
+			Role:          user.Role,
 		},
 	})
 }
