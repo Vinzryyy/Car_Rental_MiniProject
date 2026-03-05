@@ -68,10 +68,11 @@ func NewApp(cfg *config.Config) (*App, error) {
 	carRepo := repository.NewCarRepository(db.Pool)
 	rentalRepo := repository.NewRentalRepository(db.Pool)
 	topUpRepo := repository.NewTopUpRepository(db.Pool)
+	sessionRepo := repository.NewSessionRepository(db.Pool)
 
 	// Initialize services
 	emailService := service.NewEmailService(cfg)
-	authService := service.NewAuthService(userRepo, &cfg.JWT, emailService)
+	authService := service.NewAuthService(userRepo, sessionRepo, &cfg.JWT, emailService)
 	carService := service.NewCarService(carRepo)
 	paymentService := service.NewXenditPaymentService(cfg)
 	rentalService := service.NewRentalService(rentalRepo, carRepo, userRepo, paymentService, emailService)
