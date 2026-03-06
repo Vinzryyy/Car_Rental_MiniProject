@@ -30,23 +30,6 @@ type App struct {
 }
 
 func NewApp(cfg *config.Config) (*App, error) {
-	// Initialize database
-	db, err := database.Initialize(&cfg.Database)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
-	}
-
-	// Note: Migrations and seeding are skipped - manage schema via Supabase Dashboard
-	// Run migrations
-	// if err := db.RunMigrations(); err != nil {
-	// 	return nil, fmt.Errorf("failed to run migrations: %w", err)
-	// }
-
-	// Seed initial data
-	// if err := db.SeedData(); err != nil {
-	// 	log.Printf("Warning: failed to seed data: %v", err)
-	// }
-
 	// Initialize Echo
 	e := echo.New()
 
@@ -63,32 +46,58 @@ func NewApp(cfg *config.Config) (*App, error) {
 	// Set custom validator
 	e.Validator = middleware.NewCustomValidator()
 
-	// Initialize repositories
-	userRepo := repository.NewUserRepository(db.Pool)
-	carRepo := repository.NewCarRepository(db.Pool)
-	rentalRepo := repository.NewRentalRepository(db.Pool)
-	topUpRepo := repository.NewTopUpRepository(db.Pool)
-	sessionRepo := repository.NewSessionRepository(db.Pool)
+	// Initialize database (non-blocking)
+	var db *database.Database
+	var initErr error
+	db, initErr = database.Initialize(&cfg.Database)
+	if initErr != nil {
+		log.Printf("Warning: database initialization failed: %v", initErr)
+		log.Println("Server will start but API endpoints requiring database will return errors")
+	}
 
-	// Initialize services
-	emailService := service.NewEmailService(cfg)
-	authService := service.NewAuthService(userRepo, sessionRepo, &cfg.JWT, emailService)
-	carService := service.NewCarService(carRepo)
-	paymentService := service.NewXenditPaymentService(cfg)
-	rentalService := service.NewRentalService(rentalRepo, carRepo, userRepo, paymentService, emailService)
-	topUpService := service.NewTopUpService(topUpRepo, userRepo, paymentService, emailService)
+	// Note: Migrations and seeding are skipped - manage schema via Supabase Dashboard
+	// Run migrations
+	// if err := db.RunMigrations(); err != nil {
+	// 	return nil, fmt.Errorf("failed to run migrations: %w", err)
+	// }
 
-	// Initialize middleware
-	jwtMiddleware := middleware.NewJWTMiddleware(authService, &cfg.JWT)
+	// Seed initial data
+	// if err := db.SeedData(); err != nil {
+	// 	log.Printf("Warning: failed to seed data: %v", err)
+	// }
 
-	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authService, middleware.NewCustomValidator())
-	carHandler := handler.NewCarHandler(carService, middleware.NewCustomValidator())
-	rentalHandler := handler.NewRentalHandler(rentalService, topUpService, middleware.NewCustomValidator())
-	webhookHandler := handler.NewPaymentWebhookHandler(rentalService, topUpService, paymentService, emailService)
+	// Initialize repositories and services only if DB is connected
+	if db != nil {
+		// Initialize repositories
+		userRepo := repository.NewUserRepository(db.Pool)
+		carRepo := repository.NewCarRepository(db.Pool)
+		rentalRepo := repository.NewRentalRepository(db.Pool)
+		topUpRepo := repository.NewTopUpRepository(db.Pool)
+		sessionRepo := repository.NewSessionRepository(db.Pool)
 
-	// Setup routes
-	setupRoutes(e, authHandler, carHandler, rentalHandler, jwtMiddleware, webhookHandler)
+		// Initialize services
+		emailService := service.NewEmailService(cfg)
+		authService := service.NewAuthService(userRepo, sessionRepo, &cfg.JWT, emailService)
+		carService := service.NewCarService(carRepo)
+		paymentService := service.NewXenditPaymentService(cfg)
+		rentalService := service.NewRentalService(rentalRepo, carRepo, userRepo, paymentService, emailService)
+		topUpService := service.NewTopUpService(topUpRepo, userRepo, paymentService, emailService)
+
+		// Initialize middleware
+		jwtMiddleware := middleware.NewJWTMiddleware(authService, &cfg.JWT)
+
+		// Initialize handlers
+		authHandler := handler.NewAuthHandler(authService, middleware.NewCustomValidator())
+		carHandler := handler.NewCarHandler(carService, middleware.NewCustomValidator())
+		rentalHandler := handler.NewRentalHandler(rentalService, topUpService, middleware.NewCustomValidator())
+		webhookHandler := handler.NewPaymentWebhookHandler(rentalService, topUpService, paymentService, emailService)
+
+		// Setup routes
+		setupRoutes(e, authHandler, carHandler, rentalHandler, jwtMiddleware, webhookHandler, db)
+	} else {
+		// Setup minimal routes without database
+		setupMinimalRoutes(e)
+	}
 
 	return &App{
 		echo:     e,
@@ -97,12 +106,22 @@ func NewApp(cfg *config.Config) (*App, error) {
 	}, nil
 }
 
-func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *handler.CarHandler, rentalHandler *handler.RentalHandler, jwtMiddleware *middleware.JWTMiddleware, webhookHandler *handler.PaymentWebhookHandler) {
-	// Health check
+func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *handler.CarHandler, rentalHandler *handler.RentalHandler, jwtMiddleware *middleware.JWTMiddleware, webhookHandler *handler.PaymentWebhookHandler, db *database.Database) {
+	// Health check with database status
 	e.GET("/health", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{
+		response := map[string]interface{}{
 			"status": "healthy",
-		})
+		}
+		if db != nil && db.Pool != nil {
+			if err := db.Pool.Ping(context.Background()); err == nil {
+				response["database"] = "connected"
+			} else {
+				response["database"] = "disconnected"
+			}
+		} else {
+			response["database"] = "not initialized"
+		}
+		return c.JSON(http.StatusOK, response)
 	})
 
 	// Swagger
@@ -150,6 +169,42 @@ func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *han
 	// Webhook routes (public, but should be secured by Xendit callback verification)
 	webhook := api.Group("/webhook")
 	webhook.POST("/payment", webhookHandler.PaymentNotification)
+}
+
+func setupMinimalRoutes(e *echo.Echo) {
+	// Health check indicating database is not connected
+	e.GET("/health", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
+			"status":   "healthy",
+			"database": "not initialized - check database credentials",
+		})
+	})
+
+	// Swagger
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
+
+	// API routes - return error for all API calls
+	api := e.Group("/api")
+	api.GET("/*", func(c echo.Context) error {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"error": "Database not connected. Please check your database configuration.",
+		})
+	})
+	api.POST("/*", func(c echo.Context) error {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"error": "Database not connected. Please check your database configuration.",
+		})
+	})
+	api.PUT("/*", func(c echo.Context) error {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"error": "Database not connected. Please check your database configuration.",
+		})
+	})
+	api.DELETE("/*", func(c echo.Context) error {
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{
+			"error": "Database not connected. Please check your database configuration.",
+		})
+	})
 }
 
 func (a *App) Start() {
