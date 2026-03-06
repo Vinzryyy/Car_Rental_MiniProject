@@ -15,15 +15,75 @@ import (
 )
 
 type CarHandler struct {
-	carService service.CarService
-	validator  *middleware.CustomValidator
+	carService   service.CarService
+	imageService service.ImageService
+	validator    *middleware.CustomValidator
 }
 
-func NewCarHandler(carService service.CarService, validator *middleware.CustomValidator) *CarHandler {
+func NewCarHandler(carService service.CarService, imageService service.ImageService, validator *middleware.CustomValidator) *CarHandler {
 	return &CarHandler{
-		carService: carService,
-		validator:  validator,
+		carService:   carService,
+		imageService: imageService,
+		validator:    validator,
 	}
+}
+
+// UploadCarImage godoc
+// @Summary Upload car image
+// @Description Upload an image for a car to Cloudinary (admin only)
+// @Tags cars
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param image formData file true "Car image file"
+// @Success 200 {object} dto.APIResponse{data=dto.PaymentResponse}
+// @Failure 400 {object} dto.APIResponse
+// @Failure 401 {object} dto.APIResponse
+// @Failure 500 {object} dto.APIResponse
+// @Router /api/cars/upload [post]
+func (h *CarHandler) UploadCarImage(c echo.Context) error {
+	if h.imageService == nil {
+		return c.JSON(http.StatusServiceUnavailable, dto.APIResponse{
+			Success: false,
+			Message: "image service not configured",
+		})
+	}
+
+	file, err := c.FormFile("image")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, dto.APIResponse{
+			Success: false,
+			Message: "failed to get image file",
+			Error:   err.Error(),
+		})
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, dto.APIResponse{
+			Success: false,
+			Message: "failed to open image file",
+			Error:   err.Error(),
+		})
+	}
+	defer src.Close()
+
+	url, err := h.imageService.UploadImage(c.Request().Context(), src, "cars")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, dto.APIResponse{
+			Success: false,
+			Message: "failed to upload image",
+			Error:   err.Error(),
+		})
+	}
+
+	return c.JSON(http.StatusOK, dto.APIResponse{
+		Success: true,
+		Message: "image uploaded successfully",
+		Data: map[string]string{
+			"url": url,
+		},
+	})
 }
 
 // GetAllCars godoc

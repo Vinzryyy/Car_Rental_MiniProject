@@ -79,6 +79,7 @@ func NewApp(cfg *config.Config) (*App, error) {
 		emailService := service.NewEmailService(cfg)
 		authService := service.NewAuthService(userRepo, sessionRepo, &cfg.JWT, emailService)
 		carService := service.NewCarService(carRepo)
+		imageService, _ := service.NewImageService()
 		paymentService := service.NewXenditPaymentService(cfg)
 		rentalService := service.NewRentalService(rentalRepo, carRepo, userRepo, paymentService, emailService)
 		topUpService := service.NewTopUpService(topUpRepo, userRepo, paymentService, emailService)
@@ -88,7 +89,7 @@ func NewApp(cfg *config.Config) (*App, error) {
 
 		// Initialize handlers
 		authHandler := handler.NewAuthHandler(authService, middleware.NewCustomValidator())
-		carHandler := handler.NewCarHandler(carService, middleware.NewCustomValidator())
+		carHandler := handler.NewCarHandler(carService, imageService, middleware.NewCustomValidator())
 		rentalHandler := handler.NewRentalHandler(rentalService, topUpService, middleware.NewCustomValidator())
 		webhookHandler := handler.NewPaymentWebhookHandler(rentalService, topUpService, paymentService, emailService)
 
@@ -173,6 +174,7 @@ func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *han
 	cars := api.Group("/cars")
 	cars.GET("", carHandler.GetAllCars)
 	cars.GET("/:id", carHandler.GetCarByID)
+	cars.POST("/upload", carHandler.UploadCarImage, jwtMiddleware.Authenticate, jwtMiddleware.AuthorizeRole("admin"))
 	cars.POST("", carHandler.CreateCar, jwtMiddleware.Authenticate, jwtMiddleware.AuthorizeRole("admin"))
 	cars.PUT("/:id", carHandler.UpdateCar, jwtMiddleware.Authenticate, jwtMiddleware.AuthorizeRole("admin"))
 	cars.DELETE("/:id", carHandler.DeleteCar, jwtMiddleware.Authenticate, jwtMiddleware.AuthorizeRole("admin"))
