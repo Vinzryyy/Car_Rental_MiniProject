@@ -18,6 +18,16 @@ var (
 	ErrPaymentFailed             = errors.New("payment failed")
 )
 
+// PaymentService handles payment processing via Xendit API
+type PaymentService interface {
+	CreateInvoice(ctx context.Context, orderID string, amount float64, userEmail string, description string) (string, error)
+	CheckPaymentStatus(ctx context.Context, orderID string) (*PaymentNotification, error)
+	VerifyPaymentNotification(ctx context.Context, orderID string, callbackToken string) bool
+	GetPaymentMethods() []string
+	IsConfigured() bool
+	GetEnvironment() string
+}
+
 // XenditConfig holds Xendit API configuration
 type XenditConfig struct {
 	SecretKey    string
@@ -25,8 +35,8 @@ type XenditConfig struct {
 	IsProduction bool
 }
 
-// XenditPaymentService handles payment processing via Xendit API
-type XenditPaymentService struct {
+// xenditPaymentService handles payment processing via Xendit API
+type xenditPaymentService struct {
 	config     *XenditConfig
 	httpClient *http.Client
 }
@@ -61,13 +71,13 @@ type PaymentNotification struct {
 }
 
 // NewXenditPaymentService creates a new Xendit payment service
-func NewXenditPaymentService(cfg *config.Config) *XenditPaymentService {
+func NewXenditPaymentService(cfg *config.Config) PaymentService {
 	isProd := cfg.Server.Env == "production"
 	
 	// Set Xendit secret key
 	secretKey := getEnv("XENDIT_SECRET_KEY", "")
 
-	return &XenditPaymentService{
+	return &xenditPaymentService{
 		config: &XenditConfig{
 			SecretKey:    secretKey,
 			PublicKey:    getEnv("XENDIT_PUBLIC_KEY", ""),
@@ -80,7 +90,7 @@ func NewXenditPaymentService(cfg *config.Config) *XenditPaymentService {
 }
 
 // CreateInvoice creates a payment invoice using Xendit Invoice API
-func (s *XenditPaymentService) CreateInvoice(ctx context.Context, orderID string, amount float64, userEmail string, description string) (string, error) {
+func (s *xenditPaymentService) CreateInvoice(ctx context.Context, orderID string, amount float64, userEmail string, description string) (string, error) {
 	if s.config.SecretKey == "" {
 		// Return mock URL for development without API key
 		return fmt.Sprintf("https://dashboard.sandbox.xendit.co/invoices/%s", orderID), nil
@@ -133,7 +143,7 @@ func (s *XenditPaymentService) CreateInvoice(ctx context.Context, orderID string
 }
 
 // CheckPaymentStatus checks the status of a payment invoice
-func (s *XenditPaymentService) CheckPaymentStatus(ctx context.Context, orderID string) (*PaymentNotification, error) {
+func (s *xenditPaymentService) CheckPaymentStatus(ctx context.Context, orderID string) (*PaymentNotification, error) {
 	if s.config.SecretKey == "" {
 		return &PaymentNotification{
 			OrderID:           orderID,
@@ -180,7 +190,7 @@ func (s *XenditPaymentService) CheckPaymentStatus(ctx context.Context, orderID s
 }
 
 // VerifyPaymentNotification verifies a payment notification from Xendit
-func (s *XenditPaymentService) VerifyPaymentNotification(ctx context.Context, orderID string, callbackToken string) bool {
+func (s *xenditPaymentService) VerifyPaymentNotification(ctx context.Context, orderID string, callbackToken string) bool {
 	if s.config.SecretKey == "" {
 		return true
 	}
@@ -192,7 +202,7 @@ func (s *XenditPaymentService) VerifyPaymentNotification(ctx context.Context, or
 }
 
 // GetPaymentMethods returns available payment methods
-func (s *XenditPaymentService) GetPaymentMethods() []string {
+func (s *xenditPaymentService) GetPaymentMethods() []string {
 	return []string{
 		"Bank Transfer",
 		"E-Wallet (GoPay, OVO, Dana, LinkAja)",
@@ -204,12 +214,12 @@ func (s *XenditPaymentService) GetPaymentMethods() []string {
 }
 
 // IsConfigured returns true if the payment gateway is configured
-func (s *XenditPaymentService) IsConfigured() bool {
+func (s *xenditPaymentService) IsConfigured() bool {
 	return s.config.SecretKey != ""
 }
 
 // GetEnvironment returns the current environment (sandbox/production)
-func (s *XenditPaymentService) GetEnvironment() string {
+func (s *xenditPaymentService) GetEnvironment() string {
 	if s.config.IsProduction {
 		return "production"
 	}
