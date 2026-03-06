@@ -35,11 +35,11 @@ type rentalService struct {
 	rentalRepo     repository.RentalRepository
 	carRepo        repository.CarRepository
 	userRepo       repository.UserRepository
-	paymentService *XenditPaymentService
+	paymentService PaymentService
 	emailService   *EmailService
 }
 
-func NewRentalService(rentalRepo repository.RentalRepository, carRepo repository.CarRepository, userRepo repository.UserRepository, paymentService *XenditPaymentService, emailService *EmailService) RentalService {
+func NewRentalService(rentalRepo repository.RentalRepository, carRepo repository.CarRepository, userRepo repository.UserRepository, paymentService PaymentService, emailService *EmailService) RentalService {
 	return &rentalService{
 		rentalRepo:     rentalRepo,
 		carRepo:        carRepo,

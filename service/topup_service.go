@@ -23,11 +23,11 @@ type TopUpService interface {
 type topUpService struct {
 	topUpRepo        repository.TopUpRepository
 	userRepo         repository.UserRepository
-	paymentService   *XenditPaymentService
+	paymentService   PaymentService
 	emailService     *EmailService
 }
 
-func NewTopUpService(topUpRepo repository.TopUpRepository, userRepo repository.UserRepository, paymentService *XenditPaymentService, emailService *EmailService) TopUpService {
+func NewTopUpService(topUpRepo repository.TopUpRepository, userRepo repository.UserRepository, paymentService PaymentService, emailService *EmailService) TopUpService {
 	return &topUpService{
 		topUpRepo:      topUpRepo,
 		userRepo:       userRepo,

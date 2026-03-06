@@ -16,11 +16,11 @@ import (
 type PaymentWebhookHandler struct {
 	rentalService  service.RentalService
 	topUpService   service.TopUpService
-	paymentService *service.XenditPaymentService
+	paymentService service.PaymentService
 	emailService   *service.EmailService
 }
 
-func NewPaymentWebhookHandler(rentalService service.RentalService, topUpService service.TopUpService, paymentService *service.XenditPaymentService, emailService *service.EmailService) *PaymentWebhookHandler {
+func NewPaymentWebhookHandler(rentalService service.RentalService, topUpService service.TopUpService, paymentService service.PaymentService, emailService *service.EmailService) *PaymentWebhookHandler {
 	return &PaymentWebhookHandler{
 		rentalService:  rentalService,
 		topUpService:   topUpService,
