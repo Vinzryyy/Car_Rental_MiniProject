@@ -9,6 +9,7 @@ import (
 	"car_rental_miniproject/repository"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -23,6 +24,11 @@ func (m *MockCarRepository) Create(ctx context.Context, car *model.Car) error {
 	return args.Error(0)
 }
 
+func (m *MockCarRepository) WithTx(tx pgx.Tx) repository.CarRepository {
+	args := m.Called(tx)
+	return args.Get(0).(repository.CarRepository)
+}
+
 func (m *MockCarRepository) GetAll(ctx context.Context, filter repository.CarFilter) ([]model.Car, int, error) {
 	args := m.Called(ctx, filter)
 	if args.Get(0) == nil {
@@ -32,6 +38,14 @@ func (m *MockCarRepository) GetAll(ctx context.Context, filter repository.CarFil
 }
 
 func (m *MockCarRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Car, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Car), args.Error(1)
+}
+
+func (m *MockCarRepository) GetByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.Car, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

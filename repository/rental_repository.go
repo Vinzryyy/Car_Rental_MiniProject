@@ -7,10 +7,12 @@ import (
 	"car_rental_miniproject/model"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RentalRepository interface {
+	WithTx(tx pgx.Tx) RentalRepository
 	Create(ctx context.Context, rental *model.RentalHistory) error
 	GetByID(ctx context.Context, id uuid.UUID) (*model.RentalHistory, error)
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]model.RentalHistory, error)
@@ -25,23 +27,35 @@ type RentalRepository interface {
 
 type rentalRepository struct {
 	pool *pgxpool.Pool
+	tx   pgx.Tx
 }
 
 func NewRentalRepository(pool *pgxpool.Pool) RentalRepository {
 	return &rentalRepository{pool: pool}
 }
 
+func (r *rentalRepository) WithTx(tx pgx.Tx) RentalRepository {
+	return &rentalRepository{pool: r.pool, tx: tx}
+}
+
+func (r *rentalRepository) getQuerier() Querier {
+	if r.tx != nil {
+		return r.tx
+	}
+	return r.pool
+}
+
 func (r *rentalRepository) Create(ctx context.Context, rental *model.RentalHistory) error {
 	query := `INSERT INTO rental_histories (id, user_id, car_id, rental_date, return_date, total_cost, status, payment_status, payment_url, created_at, updated_at) 
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
-	_, err := r.pool.Exec(ctx, query, rental.ID, rental.UserID, rental.CarID, rental.RentalDate, rental.ReturnDate, rental.TotalCost, rental.Status, rental.PaymentStatus, rental.PaymentURL, rental.CreatedAt, rental.UpdatedAt)
+	_, err := r.getQuerier().Exec(ctx, query, rental.ID, rental.UserID, rental.CarID, rental.RentalDate, rental.ReturnDate, rental.TotalCost, rental.Status, rental.PaymentStatus, rental.PaymentURL, rental.CreatedAt, rental.UpdatedAt)
 	return err
 }
 
 func (r *rentalRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.RentalHistory, error) {
 	query := `SELECT id, user_id, car_id, rental_date, return_date, total_cost, status, payment_status, payment_url, created_at, updated_at FROM rental_histories WHERE id = $1`
 	rental := &model.RentalHistory{}
-	err := r.pool.QueryRow(ctx, query, id).Scan(&rental.ID, &rental.UserID, &rental.CarID, &rental.RentalDate, &rental.ReturnDate, &rental.TotalCost, &rental.Status, &rental.PaymentStatus, &rental.PaymentURL, &rental.CreatedAt, &rental.UpdatedAt)
+	err := r.getQuerier().QueryRow(ctx, query, id).Scan(&rental.ID, &rental.UserID, &rental.CarID, &rental.RentalDate, &rental.ReturnDate, &rental.TotalCost, &rental.Status, &rental.PaymentStatus, &rental.PaymentURL, &rental.CreatedAt, &rental.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +64,7 @@ func (r *rentalRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Re
 
 func (r *rentalRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]model.RentalHistory, error) {
 	query := `SELECT id, user_id, car_id, rental_date, return_date, total_cost, status, payment_status, payment_url, created_at, updated_at FROM rental_histories WHERE user_id = $1 ORDER BY created_at DESC`
-	rows, err := r.pool.Query(ctx, query, userID)
+	rows, err := r.getQuerier().Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +88,7 @@ func (r *rentalRepository) GetByUserIDWithCarDetails(ctx context.Context, userID
 			  FROM rental_histories rh 
 			  JOIN cars c ON rh.car_id = c.id 
 			  WHERE rh.user_id = $1 ORDER BY rh.created_at DESC`
-	rows, err := r.pool.Query(ctx, query, userID)
+	rows, err := r.getQuerier().Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -95,13 +109,13 @@ func (r *rentalRepository) GetByUserIDWithCarDetails(ctx context.Context, userID
 
 func (r *rentalRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status, paymentStatus string) error {
 	query := `UPDATE rental_histories SET status = $1, payment_status = $2, updated_at = $3 WHERE id = $4`
-	_, err := r.pool.Exec(ctx, query, status, paymentStatus, time.Now(), id)
+	_, err := r.getQuerier().Exec(ctx, query, status, paymentStatus, time.Now(), id)
 	return err
 }
 
 func (r *rentalRepository) UpdatePaymentURL(ctx context.Context, id uuid.UUID, paymentURL string) error {
 	query := `UPDATE rental_histories SET payment_url = $1, updated_at = $2 WHERE id = $3`
-	_, err := r.pool.Exec(ctx, query, paymentURL, time.Now(), id)
+	_, err := r.getQuerier().Exec(ctx, query, paymentURL, time.Now(), id)
 	return err
 }
 
@@ -114,14 +128,14 @@ func (r *rentalRepository) GetBookingReport(ctx context.Context, userID uuid.UUI
 			  WHERE rh.user_id = $1`
 	
 	report := &model.BookingReport{UserID: userID}
-	err := r.pool.QueryRow(ctx, query, userID).Scan(&report.TotalRentals, &report.ActiveRentals, &report.TotalSpent)
+	err := r.getQuerier().QueryRow(ctx, query, userID).Scan(&report.TotalRentals, &report.ActiveRentals, &report.TotalSpent)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get user email and deposit
 	userQuery := `SELECT email, deposit_amount FROM users WHERE id = $1`
-	err = r.pool.QueryRow(ctx, userQuery, userID).Scan(&report.Email, &report.CurrentDeposit)
+	err = r.getQuerier().QueryRow(ctx, userQuery, userID).Scan(&report.Email, &report.CurrentDeposit)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +149,7 @@ func (r *rentalRepository) GetOverdueRentals(ctx context.Context) ([]model.Renta
 			  JOIN cars c ON rh.car_id = c.id 
 			  WHERE rh.status = 'active' AND rh.return_date < $1`
 	
-	rows, err := r.pool.Query(ctx, query, time.Now())
+	rows, err := r.getQuerier().Query(ctx, query, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -159,21 +173,21 @@ func (r *rentalRepository) GetAdminStats(ctx context.Context) (*model.AdminStats
 	
 	// Total Revenue (only from paid rentals)
 	queryRevenue := `SELECT COALESCE(SUM(total_cost), 0) FROM rental_histories WHERE payment_status = 'paid'`
-	err := r.pool.QueryRow(ctx, queryRevenue).Scan(&stats.TotalRevenue)
+	err := r.getQuerier().QueryRow(ctx, queryRevenue).Scan(&stats.TotalRevenue)
 	if err != nil {
 		return nil, err
 	}
 
 	// Total Rentals
 	queryRentals := `SELECT COUNT(*) FROM rental_histories`
-	err = r.pool.QueryRow(ctx, queryRentals).Scan(&stats.TotalRentals)
+	err = r.getQuerier().QueryRow(ctx, queryRentals).Scan(&stats.TotalRentals)
 	if err != nil {
 		return nil, err
 	}
 
 	// Total Users
 	queryUsers := `SELECT COUNT(*) FROM users`
-	err = r.pool.QueryRow(ctx, queryUsers).Scan(&stats.TotalUsers)
+	err = r.getQuerier().QueryRow(ctx, queryUsers).Scan(&stats.TotalUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +203,7 @@ func (r *rentalRepository) GetPopularCars(ctx context.Context, limit int) ([]mod
 			  ORDER BY rental_count DESC 
 			  LIMIT $1`
 	
-	rows, err := r.pool.Query(ctx, query, limit)
+	rows, err := r.getQuerier().Query(ctx, query, limit)
 	if err != nil {
 		return nil, err
 	}

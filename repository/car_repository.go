@@ -8,6 +8,7 @@ import (
 	"car_rental_miniproject/model"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -22,9 +23,11 @@ type CarFilter struct {
 }
 
 type CarRepository interface {
+	WithTx(tx pgx.Tx) CarRepository
 	Create(ctx context.Context, car *model.Car) error
 	GetAll(ctx context.Context, filter CarFilter) ([]model.Car, int, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*model.Car, error)
+	GetByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.Car, error)
 	Update(ctx context.Context, car *model.Car) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	DecreaseStock(ctx context.Context, id uuid.UUID) error
@@ -33,16 +36,28 @@ type CarRepository interface {
 
 type carRepository struct {
 	pool *pgxpool.Pool
+	tx   pgx.Tx
 }
 
 func NewCarRepository(pool *pgxpool.Pool) CarRepository {
 	return &carRepository{pool: pool}
 }
 
+func (r *carRepository) WithTx(tx pgx.Tx) CarRepository {
+	return &carRepository{pool: r.pool, tx: tx}
+}
+
+func (r *carRepository) getQuerier() Querier {
+	if r.tx != nil {
+		return r.tx
+	}
+	return r.pool
+}
+
 func (r *carRepository) Create(ctx context.Context, car *model.Car) error {
 	query := `INSERT INTO cars (id, name, availability, stock_availability, rental_costs, category, description, image_url, created_at, updated_at) 
 			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
-	_, err := r.pool.Exec(ctx, query, car.ID, car.Name, car.Availability, car.StockAvailability, car.RentalCosts, car.Category, car.Description, car.ImageURL, car.CreatedAt, car.UpdatedAt)
+	_, err := r.getQuerier().Exec(ctx, query, car.ID, car.Name, car.Availability, car.StockAvailability, car.RentalCosts, car.Category, car.Description, car.ImageURL, car.CreatedAt, car.UpdatedAt)
 	return err
 }
 
@@ -117,13 +132,13 @@ func (r *carRepository) GetAll(ctx context.Context, filter CarFilter) ([]model.C
 
 	// Get total count
 	var total int
-	err := r.pool.QueryRow(ctx, countQuery, args[:argIndex-1]...).Scan(&total)
+	err := r.getQuerier().QueryRow(ctx, countQuery, args[:argIndex-1]...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// Get data
-	rows, err := r.pool.Query(ctx, dataQuery, args...)
+	rows, err := r.getQuerier().Query(ctx, dataQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -145,7 +160,17 @@ func (r *carRepository) GetAll(ctx context.Context, filter CarFilter) ([]model.C
 func (r *carRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Car, error) {
 	query := `SELECT id, name, availability, stock_availability, rental_costs, category, description, image_url, created_at, updated_at FROM cars WHERE id = $1`
 	car := &model.Car{}
-	err := r.pool.QueryRow(ctx, query, id).Scan(&car.ID, &car.Name, &car.Availability, &car.StockAvailability, &car.RentalCosts, &car.Category, &car.Description, &car.ImageURL, &car.CreatedAt, &car.UpdatedAt)
+	err := r.getQuerier().QueryRow(ctx, query, id).Scan(&car.ID, &car.Name, &car.Availability, &car.StockAvailability, &car.RentalCosts, &car.Category, &car.Description, &car.ImageURL, &car.CreatedAt, &car.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return car, nil
+}
+
+func (r *carRepository) GetByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.Car, error) {
+	query := `SELECT id, name, availability, stock_availability, rental_costs, category, description, image_url, created_at, updated_at FROM cars WHERE id = $1 FOR UPDATE`
+	car := &model.Car{}
+	err := r.getQuerier().QueryRow(ctx, query, id).Scan(&car.ID, &car.Name, &car.Availability, &car.StockAvailability, &car.RentalCosts, &car.Category, &car.Description, &car.ImageURL, &car.CreatedAt, &car.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -155,13 +180,13 @@ func (r *carRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Car, 
 func (r *carRepository) Update(ctx context.Context, car *model.Car) error {
 	query := `UPDATE cars SET name = $1, availability = $2, stock_availability = $3, rental_costs = $4, 
 			  category = $5, description = $6, image_url = $7, updated_at = $8 WHERE id = $9`
-	_, err := r.pool.Exec(ctx, query, car.Name, car.Availability, car.StockAvailability, car.RentalCosts, car.Category, car.Description, car.ImageURL, time.Now(), car.ID)
+	_, err := r.getQuerier().Exec(ctx, query, car.Name, car.Availability, car.StockAvailability, car.RentalCosts, car.Category, car.Description, car.ImageURL, time.Now(), car.ID)
 	return err
 }
 
 func (r *carRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM cars WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id)
+	_, err := r.getQuerier().Exec(ctx, query, id)
 	return err
 }
 
@@ -169,7 +194,7 @@ func (r *carRepository) DecreaseStock(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE cars SET stock_availability = stock_availability - 1, 
 			  availability = (stock_availability - 1 > 0), updated_at = $2 
 			  WHERE id = $1 AND stock_availability > 0`
-	result, err := r.pool.Exec(ctx, query, id, time.Now())
+	result, err := r.getQuerier().Exec(ctx, query, id, time.Now())
 	if err != nil {
 		return err
 	}
@@ -184,6 +209,6 @@ func (r *carRepository) DecreaseStock(ctx context.Context, id uuid.UUID) error {
 func (r *carRepository) IncreaseStock(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE cars SET stock_availability = stock_availability + 1, 
 			  availability = true, updated_at = $2 WHERE id = $1`
-	_, err := r.pool.Exec(ctx, query, id, time.Now())
+	_, err := r.getQuerier().Exec(ctx, query, id, time.Now())
 	return err
 }

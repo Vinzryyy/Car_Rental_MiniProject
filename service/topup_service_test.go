@@ -6,8 +6,10 @@ import (
 
 	"car_rental_miniproject/app/dto"
 	"car_rental_miniproject/model"
+	"car_rental_miniproject/repository"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -20,6 +22,11 @@ type MockTopUpRepository struct {
 func (m *MockTopUpRepository) Create(ctx context.Context, transaction *model.TopUpTransaction) error {
 	args := m.Called(ctx, transaction)
 	return args.Error(0)
+}
+
+func (m *MockTopUpRepository) WithTx(tx pgx.Tx) repository.TopUpRepository {
+	args := m.Called(tx)
+	return args.Get(0).(repository.TopUpRepository)
 }
 
 func (m *MockTopUpRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.TopUpTransaction, error) {

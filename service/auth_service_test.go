@@ -9,8 +9,10 @@ import (
 	"car_rental_miniproject/app/config"
 	"car_rental_miniproject/app/dto"
 	"car_rental_miniproject/model"
+	"car_rental_miniproject/repository"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/crypto/bcrypt"
@@ -26,6 +28,11 @@ func (m *MockUserRepository) Create(ctx context.Context, user *model.User) error
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) WithTx(tx pgx.Tx) repository.UserRepository {
+	args := m.Called(tx)
+	return args.Get(0).(repository.UserRepository)
+}
+
 func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	args := m.Called(ctx, email)
 	if args.Get(0) == nil {
@@ -35,6 +42,14 @@ func (m *MockUserRepository) GetByEmail(ctx context.Context, email string) (*mod
 }
 
 func (m *MockUserRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.User), args.Error(1)
+}
+
+func (m *MockUserRepository) GetByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.User, error) {
 	args := m.Called(ctx, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

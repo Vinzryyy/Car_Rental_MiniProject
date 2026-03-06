@@ -35,6 +35,7 @@ type RentalService interface {
 }
 
 type rentalService struct {
+	pool           repository.DBPool
 	rentalRepo     repository.RentalRepository
 	carRepo        repository.CarRepository
 	userRepo       repository.UserRepository
@@ -42,8 +43,9 @@ type rentalService struct {
 	emailService   *EmailService
 }
 
-func NewRentalService(rentalRepo repository.RentalRepository, carRepo repository.CarRepository, userRepo repository.UserRepository, paymentService PaymentService, emailService *EmailService) RentalService {
+func NewRentalService(pool repository.DBPool, rentalRepo repository.RentalRepository, carRepo repository.CarRepository, userRepo repository.UserRepository, paymentService PaymentService, emailService *EmailService) RentalService {
 	return &rentalService{
+		pool:           pool,
 		rentalRepo:     rentalRepo,
 		carRepo:        carRepo,
 		userRepo:       userRepo,
@@ -53,8 +55,20 @@ func NewRentalService(rentalRepo repository.RentalRepository, carRepo repository
 }
 
 func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.RentCarRequest) (*model.RentalHistory, error) {
-	// Get car details
-	car, err := s.carRepo.GetByID(ctx, req.CarID)
+	// Start transaction
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Create repository instances with transaction
+	rentalRepoTx := s.rentalRepo.WithTx(tx)
+	carRepoTx := s.carRepo.WithTx(tx)
+	userRepoTx := s.userRepo.WithTx(tx)
+
+	// Get car details with lock
+	car, err := carRepoTx.GetByIDForUpdate(ctx, req.CarID)
 	if err != nil {
 		return nil, ErrCarNotFound
 	}
@@ -68,7 +82,7 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 	totalCost := car.RentalCosts * float64(req.RentalDays)
 
 	// Check user deposit
-	user, err := s.userRepo.GetByID(ctx, userID)
+	user, err := userRepoTx.GetByID(ctx, userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -77,8 +91,8 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 		return nil, ErrInsufficientDeposit
 	}
 
-	// Decrease car stock (atomic check)
-	if err := s.carRepo.DecreaseStock(ctx, req.CarID); err != nil {
+	// Decrease car stock
+	if err := carRepoTx.DecreaseStock(ctx, req.CarID); err != nil {
 		return nil, ErrCarNotAvailable
 	}
 
@@ -100,25 +114,25 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 		UpdatedAt:     time.Now(),
 	}
 
-	if err := s.rentalRepo.Create(ctx, rental); err != nil {
-		// Rollback stock if rental record creation fails
-		_ = s.carRepo.IncreaseStock(ctx, req.CarID)
+	if err := rentalRepoTx.Create(ctx, rental); err != nil {
 		return nil, err
 	}
 
+	// Commit transaction
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	// Post-transaction steps (external APIs)
+	
 	// Generate payment invoice URL using Xendit
 	orderID := fmt.Sprintf("RENTAL-%s", rental.ID.String())
 	description := fmt.Sprintf("Car rental payment for %s", car.Name)
-	paymentURL, err := s.paymentService.CreateInvoice(ctx, orderID, totalCost, user.Email, description)
-	if err != nil {
-		// Continue without payment URL if gateway fails
-		paymentURL = ""
-	}
-
-	// Update rental with payment URL
-	rental.PaymentURL = paymentURL
-	if err := s.rentalRepo.UpdatePaymentURL(ctx, rental.ID, paymentURL); err != nil {
-		// Log error but don't fail the request
+	paymentURL, err := s.paymentService.CreateInvoice(context.Background(), orderID, totalCost, user.Email, description)
+	if err == nil && paymentURL != "" {
+		// Update rental with payment URL (outside transaction is fine here)
+		rental.PaymentURL = paymentURL
+		_ = s.rentalRepo.UpdatePaymentURL(context.Background(), rental.ID, paymentURL)
 	}
 
 	// Send booking confirmation email (non-blocking)
