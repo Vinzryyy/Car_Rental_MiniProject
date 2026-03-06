@@ -64,6 +64,30 @@ func (m *MockRentalRepository) UpdatePaymentURL(ctx context.Context, id uuid.UUI
 	return args.Error(0)
 }
 
+func (m *MockRentalRepository) GetOverdueRentals(ctx context.Context) ([]model.RentalWithCarDetails, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.RentalWithCarDetails), args.Error(1)
+}
+
+func (m *MockRentalRepository) GetAdminStats(ctx context.Context) (*model.AdminStats, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.AdminStats), args.Error(1)
+}
+
+func (m *MockRentalRepository) GetPopularCars(ctx context.Context, limit int) ([]model.PopularCar, error) {
+	args := m.Called(ctx, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.PopularCar), args.Error(1)
+}
+
 // MockPaymentService is a mock implementation of PaymentService
 type MockPaymentService struct {
 	mock.Mock

@@ -6,6 +6,7 @@ import (
 
 	"car_rental_miniproject/app/dto"
 	"car_rental_miniproject/model"
+	"car_rental_miniproject/repository"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -22,12 +23,12 @@ func (m *MockCarRepository) Create(ctx context.Context, car *model.Car) error {
 	return args.Error(0)
 }
 
-func (m *MockCarRepository) GetAll(ctx context.Context, category string, availableOnly bool) ([]model.Car, error) {
-	args := m.Called(ctx, category, availableOnly)
+func (m *MockCarRepository) GetAll(ctx context.Context, filter repository.CarFilter) ([]model.Car, int, error) {
+	args := m.Called(ctx, filter)
 	if args.Get(0) == nil {
-		return nil, args.Error(1)
+		return nil, 0, args.Error(2)
 	}
-	return args.Get(0).([]model.Car), args.Error(1)
+	return args.Get(0).([]model.Car), args.Int(1), args.Error(2)
 }
 
 func (m *MockCarRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Car, error) {
@@ -113,13 +114,15 @@ func TestCarService_GetAllCars(t *testing.T) {
 			{ID: uuid.New(), Name: "Car 1", Category: "Sedan", Availability: true, StockAvailability: 5},
 			{ID: uuid.New(), Name: "Car 2", Category: "SUV", Availability: true, StockAvailability: 3},
 		}
+		filter := repository.CarFilter{}
 
-		mockRepo.On("GetAll", mock.Anything, "", false).Return(cars, nil)
+		mockRepo.On("GetAll", mock.Anything, filter).Return(cars, 2, nil)
 
-		result, err := service.GetAllCars(context.Background(), "", false)
+		result, total, err := service.GetAllCars(context.Background(), filter)
 
 		assert.NoError(t, err)
 		assert.Len(t, result, 2)
+		assert.Equal(t, 2, total)
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -127,13 +130,15 @@ func TestCarService_GetAllCars(t *testing.T) {
 		cars := []model.Car{
 			{ID: uuid.New(), Name: "Car 1", Category: "Sedan", Availability: true, StockAvailability: 5},
 		}
+		filter := repository.CarFilter{Category: "Sedan"}
 
-		mockRepo.On("GetAll", mock.Anything, "Sedan", false).Return(cars, nil)
+		mockRepo.On("GetAll", mock.Anything, filter).Return(cars, 1, nil)
 
-		result, err := service.GetAllCars(context.Background(), "Sedan", false)
+		result, total, err := service.GetAllCars(context.Background(), filter)
 
 		assert.NoError(t, err)
 		assert.Len(t, result, 1)
+		assert.Equal(t, 1, total)
 		assert.Equal(t, "Sedan", result[0].Category)
 		mockRepo.AssertExpectations(t)
 	})
