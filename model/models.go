@@ -70,3 +70,19 @@ type UserSession struct {
 	ExpiresAt time.Time `json:"expires_at" db:"expires_at"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
+
+// RentalWithCarDetails represents rental history with associated car name
+type RentalWithCarDetails struct {
+	RentalHistory RentalHistory
+	CarName       string
+}
+
+// BookingReport represents a comprehensive report of a user's booking activities
+type BookingReport struct {
+	UserID         uuid.UUID
+	Email          string
+	TotalRentals   int
+	ActiveRentals  int
+	TotalSpent     float64
+	CurrentDeposit float64
+}
