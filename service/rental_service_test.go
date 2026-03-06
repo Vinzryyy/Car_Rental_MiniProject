@@ -147,6 +147,21 @@ func (m *MockDBPool) Begin(ctx context.Context) (pgx.Tx, error) {
 	return args.Get(0).(pgx.Tx), args.Error(1)
 }
 
+func (m *MockDBPool) Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error) {
+	args := m.Called(ctx, sql, arguments)
+	return args.Get(0).(pgconn.CommandTag), args.Error(1)
+}
+
+func (m *MockDBPool) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
+	callArgs := m.Called(ctx, sql, args)
+	return callArgs.Get(0).(pgx.Rows), callArgs.Error(1)
+}
+
+func (m *MockDBPool) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+	callArgs := m.Called(ctx, sql, args)
+	return callArgs.Get(0).(pgx.Row)
+}
+
 func (m *MockDBPool) Close() {
 	m.Called()
 }

@@ -14,6 +14,7 @@ type Querier interface {
 }
 
 type DBPool interface {
+	Querier
 	Begin(ctx context.Context) (pgx.Tx, error)
 	Close()
 	Ping(ctx context.Context) error

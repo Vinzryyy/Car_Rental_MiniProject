@@ -11,6 +11,7 @@ import (
 	"car_rental_miniproject/repository"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,6 +21,18 @@ type pgxpoolAdapter struct {
 
 func (a *pgxpoolAdapter) Begin(ctx context.Context) (pgx.Tx, error) {
 	return a.pool.Begin(ctx)
+}
+
+func (a *pgxpoolAdapter) Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error) {
+	return a.pool.Exec(ctx, sql, arguments...)
+}
+
+func (a *pgxpoolAdapter) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
+	return a.pool.Query(ctx, sql, args...)
+}
+
+func (a *pgxpoolAdapter) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+	return a.pool.QueryRow(ctx, sql, args...)
 }
 
 func (a *pgxpoolAdapter) Close() {

@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RentalRepository interface {
@@ -26,11 +25,11 @@ type RentalRepository interface {
 }
 
 type rentalRepository struct {
-	pool *pgxpool.Pool
+	pool DBPool
 	tx   pgx.Tx
 }
 
-func NewRentalRepository(pool *pgxpool.Pool) RentalRepository {
+func NewRentalRepository(pool DBPool) RentalRepository {
 	return &rentalRepository{pool: pool}
 }
 

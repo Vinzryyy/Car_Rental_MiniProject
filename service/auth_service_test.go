@@ -82,6 +82,11 @@ func (m *MockSessionRepository) Create(ctx context.Context, session *model.UserS
 	return args.Error(0)
 }
 
+func (m *MockSessionRepository) WithTx(tx pgx.Tx) repository.SessionRepository {
+	args := m.Called(tx)
+	return args.Get(0).(repository.SessionRepository)
+}
+
 func (m *MockSessionRepository) GetByToken(ctx context.Context, token string) (*model.UserSession, error) {
 	args := m.Called(ctx, token)
 	if args.Get(0) == nil {

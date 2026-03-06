@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CarFilter struct {
@@ -35,11 +34,11 @@ type CarRepository interface {
 }
 
 type carRepository struct {
-	pool *pgxpool.Pool
+	pool DBPool
 	tx   pgx.Tx
 }
 
-func NewCarRepository(pool *pgxpool.Pool) CarRepository {
+func NewCarRepository(pool DBPool) CarRepository {
 	return &carRepository{pool: pool}
 }
 

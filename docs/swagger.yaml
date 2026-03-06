@@ -106,6 +106,27 @@ definitions:
       user:
         $ref: '#/definitions/dto.UserResponse'
     type: object
+  dto.PaginatedCarsResponse:
+    properties:
+      cars:
+        items:
+          $ref: '#/definitions/model.Car'
+        type: array
+      total:
+        type: integer
+    type: object
+  dto.PaymentResponse:
+    description: Payment information from payment gateway
+    properties:
+      payment_id:
+        type: string
+      payment_url:
+        type: string
+      redirect_url:
+        type: string
+      status:
+        type: string
+    type: object
   dto.RefreshTokenRequest:
     description: Request to refresh JWT token
     properties:
@@ -303,6 +324,34 @@ info:
   title: Rental Car API
   version: "1.0"
 paths:
+  /api/admin/dashboard:
+    get:
+      description: Get overall statistics including revenue, total rentals, total
+        users, and popular cars (admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get admin dashboard statistics
+      tags:
+      - admin
   /api/auth/change-password:
     post:
       consumes:
@@ -573,7 +622,8 @@ paths:
       - auth
   /api/cars:
     get:
-      description: Get list of all available cars with optional filtering
+      description: Get list of all available cars with optional filtering, searching,
+        sorting and pagination
       parameters:
       - description: Filter by category
         in: query
@@ -583,6 +633,26 @@ paths:
         in: query
         name: available
         type: boolean
+      - description: Search by name or description
+        in: query
+        name: search
+        type: string
+      - description: Sort by field (name, rental_costs, category, created_at, stock_availability)
+        in: query
+        name: sort_by
+        type: string
+      - description: Sort order (ASC, DESC)
+        in: query
+        name: sort_order
+        type: string
+      - description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
       produces:
       - application/json
       responses:
@@ -593,9 +663,7 @@ paths:
             - $ref: '#/definitions/dto.APIResponse'
             - properties:
                 data:
-                  items:
-                    $ref: '#/definitions/model.Car'
-                  type: array
+                  $ref: '#/definitions/dto.PaginatedCarsResponse'
               type: object
       summary: Get all cars
       tags:
@@ -743,6 +811,46 @@ paths:
       security:
       - BearerAuth: []
       summary: Update a car
+      tags:
+      - cars
+  /api/cars/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload an image for a car to Cloudinary (admin only)
+      parameters:
+      - description: Car image file
+        in: formData
+        name: image
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.PaymentResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload car image
       tags:
       - cars
   /api/rentals:
