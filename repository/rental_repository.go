@@ -14,24 +14,10 @@ type RentalRepository interface {
 	Create(ctx context.Context, rental *model.RentalHistory) error
 	GetByID(ctx context.Context, id uuid.UUID) (*model.RentalHistory, error)
 	GetByUserID(ctx context.Context, userID uuid.UUID) ([]model.RentalHistory, error)
-	GetByUserIDWithCarDetails(ctx context.Context, userID uuid.UUID) ([]RentalWithCarDetails, error)
+	GetByUserIDWithCarDetails(ctx context.Context, userID uuid.UUID) ([]model.RentalWithCarDetails, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status, paymentStatus string) error
 	UpdatePaymentURL(ctx context.Context, id uuid.UUID, paymentURL string) error
-	GetBookingReport(ctx context.Context, userID uuid.UUID) (*BookingReport, error)
-}
-
-type RentalWithCarDetails struct {
-	RentalHistory model.RentalHistory
-	CarName       string
-}
-
-type BookingReport struct {
-	UserID        uuid.UUID
-	Email         string
-	TotalRentals  int
-	ActiveRentals int
-	TotalSpent    float64
-	CurrentDeposit float64
+	GetBookingReport(ctx context.Context, userID uuid.UUID) (*model.BookingReport, error)
 }
 
 type rentalRepository struct {
@@ -80,7 +66,7 @@ func (r *rentalRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([
 	return rentals, nil
 }
 
-func (r *rentalRepository) GetByUserIDWithCarDetails(ctx context.Context, userID uuid.UUID) ([]RentalWithCarDetails, error) {
+func (r *rentalRepository) GetByUserIDWithCarDetails(ctx context.Context, userID uuid.UUID) ([]model.RentalWithCarDetails, error) {
 	query := `SELECT rh.id, rh.user_id, rh.car_id, rh.rental_date, rh.return_date, rh.total_cost, rh.status, rh.payment_status, rh.payment_url, rh.created_at, rh.updated_at, c.name as car_name 
 			  FROM rental_histories rh 
 			  JOIN cars c ON rh.car_id = c.id 
@@ -91,9 +77,9 @@ func (r *rentalRepository) GetByUserIDWithCarDetails(ctx context.Context, userID
 	}
 	defer rows.Close()
 
-	var rentals []RentalWithCarDetails
+	var rentals []model.RentalWithCarDetails
 	for rows.Next() {
-		var rental RentalWithCarDetails
+		var rental model.RentalWithCarDetails
 		err := rows.Scan(&rental.RentalHistory.ID, &rental.RentalHistory.UserID, &rental.RentalHistory.CarID, &rental.RentalHistory.RentalDate, &rental.RentalHistory.ReturnDate, &rental.RentalHistory.TotalCost, &rental.RentalHistory.Status, &rental.RentalHistory.PaymentStatus, &rental.RentalHistory.PaymentURL, &rental.RentalHistory.CreatedAt, &rental.RentalHistory.UpdatedAt, &rental.CarName)
 		if err != nil {
 			return nil, err
@@ -116,7 +102,7 @@ func (r *rentalRepository) UpdatePaymentURL(ctx context.Context, id uuid.UUID, p
 	return err
 }
 
-func (r *rentalRepository) GetBookingReport(ctx context.Context, userID uuid.UUID) (*BookingReport, error) {
+func (r *rentalRepository) GetBookingReport(ctx context.Context, userID uuid.UUID) (*model.BookingReport, error) {
 	query := `SELECT 
 			  COUNT(rh.id) as total_rentals,
 			  COUNT(CASE WHEN rh.status = 'active' THEN 1 END) as active_rentals,
@@ -124,7 +110,7 @@ func (r *rentalRepository) GetBookingReport(ctx context.Context, userID uuid.UUI
 			  FROM rental_histories rh
 			  WHERE rh.user_id = $1`
 	
-	report := &BookingReport{UserID: userID}
+	report := &model.BookingReport{UserID: userID}
 	err := r.pool.QueryRow(ctx, query, userID).Scan(&report.TotalRentals, &report.ActiveRentals, &report.TotalSpent)
 	if err != nil {
 		return nil, err
