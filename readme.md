@@ -2,7 +2,7 @@
 
 A robust, secure, and scalable REST API for a Car Rental Service built with Go (Golang). This project provides a complete solution for managing car rentals, user deposits, automated background tasks, and administrative insights.
 
-## 🚀 Tech Stack
+## Tech Stack
 
 - **Language:** Go (1.21+)
 - **Web Framework:** [Echo](https://echo.labstack.com/)
@@ -15,33 +15,33 @@ A robust, secure, and scalable REST API for a Car Rental Service built with Go (
 - **Email Service:** Gmail API (via Google OAuth2)
 - **Testing:** [testify](https://github.com/stretchr/testify) & Mocking
 
-## ✨ Core Features
+## Core Features
 
-### 🔐 Authentication & User Management
+###  Authentication & User Management
 - Secure registration and login with bcrypt password hashing.
 - JWT-based authentication with protected routes.
 - Profile management and password reset functionality.
 - Role-based Access Control (RBAC): `user` and `admin` roles.
 
-### 🚗 Car Management
+###  Car Management
 - Full CRUD operations for cars (Admin only).
 - **Advanced Search:** Full-text search by name or description.
 - **Filtering:** Filter by category and availability.
 - **Pagination & Sorting:** Efficient data retrieval with limit/offset and multi-field sorting.
 - **Image Upload:** Direct file upload to Cloudinary for car images.
 
-### 💳 Rental & Payment System
+###  Rental & Payment System
 - **Atomic Transactions:** Ensures data integrity during the rental process (car stock vs. user deposit).
 - **Payment Gateway:** Integration with Xendit for automated invoicing.
 - **Webhook Security:** Secure callback verification using Xendit callback tokens.
 - Internal deposit system for seamless internal payments.
 
-### 🤖 Automated Tasks (Background Worker)
+###  Automated Tasks (Background Worker)
 - **Rental Expiration Worker:** An hourly background job that:
     - Automatically marks rentals as `overdue` when past their due date.
     - Sends automated email reminders to users with overdue rentals.
 
-### 📊 Admin Dashboard
+###  Admin Dashboard
 - Real-time statistics including Total Revenue, Total Rentals, and Total Users.
 - Top 5 most popular cars based on rental history.
 
