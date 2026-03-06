@@ -31,6 +31,7 @@ type RentalService interface {
 	CancelRental(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error
 	ReturnCar(ctx context.Context, rentalID uuid.UUID) error
 	ProcessOverdueRentals(ctx context.Context) error
+	GetAdminDashboardStats(ctx context.Context) (*model.AdminStats, []model.PopularCar, error)
 }
 
 type rentalService struct {
@@ -304,4 +305,18 @@ func (s *rentalService) ProcessOverdueRentals(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *rentalService) GetAdminDashboardStats(ctx context.Context) (*model.AdminStats, []model.PopularCar, error) {
+	stats, err := s.rentalRepo.GetAdminStats(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	popularCars, err := s.rentalRepo.GetPopularCars(ctx, 5) // Top 5 popular cars
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return stats, popularCars, nil
 }

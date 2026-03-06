@@ -19,6 +19,8 @@ type RentalRepository interface {
 	UpdatePaymentURL(ctx context.Context, id uuid.UUID, paymentURL string) error
 	GetBookingReport(ctx context.Context, userID uuid.UUID) (*model.BookingReport, error)
 	GetOverdueRentals(ctx context.Context) ([]model.RentalWithCarDetails, error)
+	GetAdminStats(ctx context.Context) (*model.AdminStats, error)
+	GetPopularCars(ctx context.Context, limit int) ([]model.PopularCar, error)
 }
 
 type rentalRepository struct {
@@ -150,4 +152,58 @@ func (r *rentalRepository) GetOverdueRentals(ctx context.Context) ([]model.Renta
 	}
 
 	return rentals, nil
+}
+
+func (r *rentalRepository) GetAdminStats(ctx context.Context) (*model.AdminStats, error) {
+	stats := &model.AdminStats{}
+	
+	// Total Revenue (only from paid rentals)
+	queryRevenue := `SELECT COALESCE(SUM(total_cost), 0) FROM rental_histories WHERE payment_status = 'paid'`
+	err := r.pool.QueryRow(ctx, queryRevenue).Scan(&stats.TotalRevenue)
+	if err != nil {
+		return nil, err
+	}
+
+	// Total Rentals
+	queryRentals := `SELECT COUNT(*) FROM rental_histories`
+	err = r.pool.QueryRow(ctx, queryRentals).Scan(&stats.TotalRentals)
+	if err != nil {
+		return nil, err
+	}
+
+	// Total Users
+	queryUsers := `SELECT COUNT(*) FROM users`
+	err = r.pool.QueryRow(ctx, queryUsers).Scan(&stats.TotalUsers)
+	if err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}
+
+func (r *rentalRepository) GetPopularCars(ctx context.Context, limit int) ([]model.PopularCar, error) {
+	query := `SELECT c.id, c.name, COUNT(rh.id) as rental_count 
+			  FROM cars c 
+			  LEFT JOIN rental_histories rh ON c.id = rh.car_id 
+			  GROUP BY c.id, c.name 
+			  ORDER BY rental_count DESC 
+			  LIMIT $1`
+	
+	rows, err := r.pool.Query(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var popularCars []model.PopularCar
+	for rows.Next() {
+		var pc model.PopularCar
+		err := rows.Scan(&pc.CarID, &pc.CarName, &pc.RentalCount)
+		if err != nil {
+			return nil, err
+		}
+		popularCars = append(popularCars, pc)
+	}
+
+	return popularCars, nil
 }

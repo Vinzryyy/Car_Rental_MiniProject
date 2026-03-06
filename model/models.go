@@ -86,3 +86,17 @@ type BookingReport struct {
 	TotalSpent     float64
 	CurrentDeposit float64
 }
+
+// AdminStats represents the overall statistics for administrative dashboard
+type AdminStats struct {
+	TotalRevenue float64
+	TotalRentals int
+	TotalUsers   int
+}
+
+// PopularCar represents a car with its rental count
+type PopularCar struct {
+	CarID       uuid.UUID `json:"car_id"`
+	CarName     string    `json:"car_name"`
+	RentalCount int       `json:"rental_count"`
+}

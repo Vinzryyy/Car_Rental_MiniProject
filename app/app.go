@@ -92,9 +92,10 @@ func NewApp(cfg *config.Config) (*App, error) {
 		carHandler := handler.NewCarHandler(carService, imageService, middleware.NewCustomValidator())
 		rentalHandler := handler.NewRentalHandler(rentalService, topUpService, middleware.NewCustomValidator())
 		webhookHandler := handler.NewPaymentWebhookHandler(rentalService, topUpService, paymentService, emailService)
+		adminHandler := handler.NewAdminHandler(rentalService)
 
 		// Setup routes
-		setupRoutes(e, authHandler, carHandler, rentalHandler, jwtMiddleware, webhookHandler, db)
+		setupRoutes(e, authHandler, carHandler, rentalHandler, jwtMiddleware, webhookHandler, adminHandler, db)
 
 		// Start background workers
 		startWorkers(rentalService)
@@ -131,7 +132,7 @@ func startWorkers(rentalService service.RentalService) {
 	}()
 }
 
-func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *handler.CarHandler, rentalHandler *handler.RentalHandler, jwtMiddleware *middleware.JWTMiddleware, webhookHandler *handler.PaymentWebhookHandler, db *database.Database) {
+func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *handler.CarHandler, rentalHandler *handler.RentalHandler, jwtMiddleware *middleware.JWTMiddleware, webhookHandler *handler.PaymentWebhookHandler, adminHandler *handler.AdminHandler, db *database.Database) {
 	// Health check with database status
 	e.GET("/health", func(c echo.Context) error {
 		response := map[string]interface{}{
@@ -191,6 +192,10 @@ func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *han
 	topup := api.Group("/topup", jwtMiddleware.Authenticate)
 	topup.POST("", rentalHandler.TopUp)
 	topup.GET("/history", rentalHandler.GetTopUpHistory)
+
+	// Admin routes (protected)
+	admin := api.Group("/admin", jwtMiddleware.Authenticate, jwtMiddleware.AuthorizeRole("admin"))
+	admin.GET("/dashboard", adminHandler.GetDashboardStats)
 
 	// Webhook routes (public, but should be secured by Xendit callback verification)
 	webhook := api.Group("/webhook")
