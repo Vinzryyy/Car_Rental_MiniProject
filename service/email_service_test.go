@@ -9,17 +9,18 @@ import (
 )
 
 func TestEmailService_IsEnabled(t *testing.T) {
-	t.Run("enabled", func(t *testing.T) {
+	t.Run("enabled in config but no credentials", func(t *testing.T) {
 		cfg := &config.Config{
 			Email: config.EmailConfig{
 				IsEnabled: true,
 			},
 		}
 		service := NewEmailService(cfg)
-		assert.True(t, service.IsEnabled())
+		// Should be false because no credentials provided
+		assert.False(t, service.IsEnabled())
 	})
 
-	t.Run("disabled", func(t *testing.T) {
+	t.Run("disabled in config", func(t *testing.T) {
 		cfg := &config.Config{
 			Email: config.EmailConfig{
 				IsEnabled: false,

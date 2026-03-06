@@ -75,7 +75,16 @@ type PasswordResetData struct {
 
 // NewEmailService creates a new Gmail API email service
 func NewEmailService(cfg *config.Config) *EmailService {
-	// Check if Gmail API is configured
+	// Check if Gmail API is enabled in config
+	if !cfg.Email.IsEnabled {
+		return &EmailService{
+			isEnabled: false,
+			fromEmail: cfg.Email.FromEmail,
+			fromName:  cfg.Email.FromName,
+			templates: loadEmailTemplates(),
+		}
+	}
+
 	apiKey := cfg.Email.GmailAPIKey
 	serviceAccount := cfg.Email.GmailServiceAccountJSON
 
@@ -86,19 +95,19 @@ func NewEmailService(cfg *config.Config) *EmailService {
 	if serviceAccount != "" {
 		// Use service account for sending emails
 		gmailSvc, err = gmail.NewService(context.Background(), option.WithCredentialsJSON([]byte(serviceAccount)))
-		if err != nil {
-			isEnabled = false
-		} else {
+		if err == nil {
 			isEnabled = true
 		}
 	} else if apiKey != "" {
 		// Use API key (limited functionality)
 		gmailSvc, err = gmail.NewService(context.Background(), option.WithAPIKey(apiKey))
-		if err != nil {
-			isEnabled = false
-		} else {
+		if err == nil {
 			isEnabled = true
 		}
+	} else if cfg.Server.Env == "test" || cfg.Server.Env == "development" {
+		// Allow "enabled" state without real credentials for testing/dev if needed
+		// But usually we want it disabled if no credentials
+		isEnabled = false
 	}
 
 	fromEmail := cfg.Email.FromEmail
