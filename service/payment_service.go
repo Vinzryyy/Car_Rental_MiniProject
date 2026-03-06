@@ -30,9 +30,10 @@ type PaymentService interface {
 
 // XenditConfig holds Xendit API configuration
 type XenditConfig struct {
-	SecretKey    string
-	PublicKey    string
-	IsProduction bool
+	SecretKey     string
+	PublicKey     string
+	CallbackToken string
+	IsProduction  bool
 }
 
 // xenditPaymentService handles payment processing via Xendit API
@@ -74,14 +75,12 @@ type PaymentNotification struct {
 func NewXenditPaymentService(cfg *config.Config) PaymentService {
 	isProd := cfg.Server.Env == "production"
 	
-	// Set Xendit secret key
-	secretKey := getEnv("XENDIT_SECRET_KEY", "")
-
 	return &xenditPaymentService{
 		config: &XenditConfig{
-			SecretKey:    secretKey,
-			PublicKey:    getEnv("XENDIT_PUBLIC_KEY", ""),
-			IsProduction: isProd,
+			SecretKey:     getEnv("XENDIT_SECRET_KEY", ""),
+			PublicKey:     getEnv("XENDIT_PUBLIC_KEY", ""),
+			CallbackToken: getEnv("XENDIT_CALLBACK_TOKEN", ""),
+			IsProduction:  isProd,
 		},
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -191,14 +190,14 @@ func (s *xenditPaymentService) CheckPaymentStatus(ctx context.Context, orderID s
 
 // VerifyPaymentNotification verifies a payment notification from Xendit
 func (s *xenditPaymentService) VerifyPaymentNotification(ctx context.Context, orderID string, callbackToken string) bool {
-	if s.config.SecretKey == "" {
+	// If callback token is not configured, we allow all (for development)
+	// In production, this should always be configured
+	if s.config.CallbackToken == "" {
 		return true
 	}
 
 	// Verify callback token from Xendit
-	// Xendit sends a callback-token header for webhook verification
-	// The verification is done by comparing the hash
-	return callbackToken != "" // Simplified - in production, verify the actual signature
+	return callbackToken == s.config.CallbackToken
 }
 
 // GetPaymentMethods returns available payment methods
