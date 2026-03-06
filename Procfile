@@ -1,1 +1,1 @@
-web: ./car_rental_miniproject
+web: ./Car_Rental_MiniProject
