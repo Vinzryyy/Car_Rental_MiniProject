@@ -18,6 +18,7 @@ type RentalRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status, paymentStatus string) error
 	UpdatePaymentURL(ctx context.Context, id uuid.UUID, paymentURL string) error
 	GetBookingReport(ctx context.Context, userID uuid.UUID) (*model.BookingReport, error)
+	GetOverdueRentals(ctx context.Context) ([]model.RentalWithCarDetails, error)
 }
 
 type rentalRepository struct {
@@ -124,4 +125,29 @@ func (r *rentalRepository) GetBookingReport(ctx context.Context, userID uuid.UUI
 	}
 
 	return report, nil
+}
+
+func (r *rentalRepository) GetOverdueRentals(ctx context.Context) ([]model.RentalWithCarDetails, error) {
+	query := `SELECT rh.id, rh.user_id, rh.car_id, rh.rental_date, rh.return_date, rh.total_cost, rh.status, rh.payment_status, rh.payment_url, rh.created_at, rh.updated_at, c.name as car_name 
+			  FROM rental_histories rh 
+			  JOIN cars c ON rh.car_id = c.id 
+			  WHERE rh.status = 'active' AND rh.return_date < $1`
+	
+	rows, err := r.pool.Query(ctx, query, time.Now())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rentals []model.RentalWithCarDetails
+	for rows.Next() {
+		var rental model.RentalWithCarDetails
+		err := rows.Scan(&rental.RentalHistory.ID, &rental.RentalHistory.UserID, &rental.RentalHistory.CarID, &rental.RentalHistory.RentalDate, &rental.RentalHistory.ReturnDate, &rental.RentalHistory.TotalCost, &rental.RentalHistory.Status, &rental.RentalHistory.PaymentStatus, &rental.RentalHistory.PaymentURL, &rental.RentalHistory.CreatedAt, &rental.RentalHistory.UpdatedAt, &rental.CarName)
+		if err != nil {
+			return nil, err
+		}
+		rentals = append(rentals, rental)
+	}
+
+	return rentals, nil
 }

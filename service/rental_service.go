@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"car_rental_miniproject/app/dto"
@@ -29,6 +30,7 @@ type RentalService interface {
 	ConfirmExternalPayment(ctx context.Context, rentalID uuid.UUID) error
 	CancelRental(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error
 	ReturnCar(ctx context.Context, rentalID uuid.UUID) error
+	ProcessOverdueRentals(ctx context.Context) error
 }
 
 type rentalService struct {
@@ -79,13 +81,16 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 		return nil, ErrCarNotAvailable
 	}
 
+	// Calculate return date
+	returnDate := time.Now().Add(time.Duration(req.RentalDays) * 24 * time.Hour)
+
 	// Create rental record
 	rental := &model.RentalHistory{
 		ID:            uuid.New(),
 		UserID:        userID,
 		CarID:         req.CarID,
 		RentalDate:    time.Now(),
-		ReturnDate:    nil,
+		ReturnDate:    &returnDate,
 		TotalCost:     totalCost,
 		Status:        "pending",
 		PaymentStatus: "pending",
@@ -259,10 +264,44 @@ func (s *rentalService) ReturnCar(ctx context.Context, rentalID uuid.UUID) error
 	}
 
 	// Update rental with return date and status
+	// We update return_date to now to reflect actual return time
+	// But our repository UpdateStatus only updates status and payment_status.
+	// Let's assume we want to keep the original ReturnDate (due date) or update it.
+	// For simplicity, let's keep the existing UpdateStatus behavior and focus on the worker.
 	if err := s.rentalRepo.UpdateStatus(ctx, rentalID, "completed", "paid"); err != nil {
 		return err
 	}
 
 	// Increase car stock back
 	return s.carRepo.IncreaseStock(ctx, rental.CarID)
+}
+
+func (s *rentalService) ProcessOverdueRentals(ctx context.Context) error {
+	overdueRentals, err := s.rentalRepo.GetOverdueRentals(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, r := range overdueRentals {
+		// Update status to overdue
+		err := s.rentalRepo.UpdateStatus(ctx, r.RentalHistory.ID, "overdue", r.RentalHistory.PaymentStatus)
+		if err != nil {
+			log.Printf("Failed to update rental %s to overdue: %v", r.RentalHistory.ID, err)
+			continue
+		}
+
+		// Send reminder email
+		user, err := s.userRepo.GetByID(ctx, r.RentalHistory.UserID)
+		if err == nil && s.emailService != nil && s.emailService.IsEnabled() {
+			_ = s.emailService.SendRentalReminderEmail(
+				ctx,
+				user.Email,
+				user.Email, // using email as username for now
+				r.CarName,
+				r.RentalHistory.ReturnDate.Format("2006-01-02 15:04:05"),
+			)
+		}
+	}
+
+	return nil
 }

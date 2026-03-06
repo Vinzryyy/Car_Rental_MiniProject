@@ -94,6 +94,9 @@ func NewApp(cfg *config.Config) (*App, error) {
 
 		// Setup routes
 		setupRoutes(e, authHandler, carHandler, rentalHandler, jwtMiddleware, webhookHandler, db)
+
+		// Start background workers
+		startWorkers(rentalService)
 	} else {
 		// Setup minimal routes without database
 		setupMinimalRoutes(e)
@@ -104,6 +107,27 @@ func NewApp(cfg *config.Config) (*App, error) {
 		config:   cfg,
 		database: db,
 	}, nil
+}
+
+func startWorkers(rentalService service.RentalService) {
+	// Rental expiration worker
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+
+		// Run once at startup
+		log.Println("Running rental expiration worker...")
+		if err := rentalService.ProcessOverdueRentals(context.Background()); err != nil {
+			log.Printf("Error processing overdue rentals: %v", err)
+		}
+
+		for range ticker.C {
+			log.Println("Running rental expiration worker...")
+			if err := rentalService.ProcessOverdueRentals(context.Background()); err != nil {
+				log.Printf("Error processing overdue rentals: %v", err)
+			}
+		}
+	}()
 }
 
 func setupRoutes(e *echo.Echo, authHandler *handler.AuthHandler, carHandler *handler.CarHandler, rentalHandler *handler.RentalHandler, jwtMiddleware *middleware.JWTMiddleware, webhookHandler *handler.PaymentWebhookHandler, db *database.Database) {
