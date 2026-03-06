@@ -3,9 +3,11 @@ package handler
 import (
 	"errors"
 	"net/http"
+	"strconv"
 
 	"car_rental_miniproject/app/dto"
 	"car_rental_miniproject/app/middleware"
+	"car_rental_miniproject/repository"
 	"car_rental_miniproject/service"
 
 	"github.com/google/uuid"
@@ -26,20 +28,41 @@ func NewCarHandler(carService service.CarService, validator *middleware.CustomVa
 
 // GetAllCars godoc
 // @Summary Get all cars
-// @Description Get list of all available cars with optional filtering
+// @Description Get list of all available cars with optional filtering, searching, sorting and pagination
 // @Tags cars
 // @Produce json
 // @Param category query string false "Filter by category"
 // @Param available query bool false "Filter by availability"
-// @Success 200 {object} dto.APIResponse{data=[]model.Car}
+// @Param search query string false "Search by name or description"
+// @Param sort_by query string false "Sort by field (name, rental_costs, category, created_at, stock_availability)"
+// @Param sort_order query string false "Sort order (ASC, DESC)"
+// @Param limit query int false "Limit number of results"
+// @Param offset query int false "Offset for pagination"
+// @Success 200 {object} dto.APIResponse{data=dto.PaginatedCarsResponse}
 // @Router /api/cars [get]
 func (h *CarHandler) GetAllCars(c echo.Context) error {
 	category := c.QueryParam("category")
 	available := c.QueryParam("available")
+	search := c.QueryParam("search")
+	sortBy := c.QueryParam("sort_by")
+	sortOrder := c.QueryParam("sort_order")
+	
+	limit, _ := strconv.Atoi(c.QueryParam("limit"))
+	offset, _ := strconv.Atoi(c.QueryParam("offset"))
 
 	availableOnly := available == "true"
 
-	cars, err := h.carService.GetAllCars(c.Request().Context(), category, availableOnly)
+	filter := repository.CarFilter{
+		Category:      category,
+		AvailableOnly: availableOnly,
+		Search:        search,
+		SortBy:        sortBy,
+		SortOrder:     sortOrder,
+		Limit:         limit,
+		Offset:        offset,
+	}
+
+	cars, total, err := h.carService.GetAllCars(c.Request().Context(), filter)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, dto.APIResponse{
 			Success: false,
@@ -51,7 +74,10 @@ func (h *CarHandler) GetAllCars(c echo.Context) error {
 	return c.JSON(http.StatusOK, dto.APIResponse{
 		Success: true,
 		Message: "cars retrieved successfully",
-		Data:    cars,
+		Data: dto.PaginatedCarsResponse{
+			Cars:  cars,
+			Total: total,
+		},
 	})
 }
 

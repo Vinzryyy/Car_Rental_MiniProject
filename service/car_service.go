@@ -20,7 +20,7 @@ var (
 
 type CarService interface {
 	CreateCar(ctx context.Context, req dto.CreateCarRequest) (*model.Car, error)
-	GetAllCars(ctx context.Context, category string, availableOnly bool) ([]model.Car, error)
+	GetAllCars(ctx context.Context, filter repository.CarFilter) ([]model.Car, int, error)
 	GetCarByID(ctx context.Context, id uuid.UUID) (*model.Car, error)
 	UpdateCar(ctx context.Context, id uuid.UUID, req dto.UpdateCarRequest) (*model.Car, error)
 	DeleteCar(ctx context.Context, id uuid.UUID) error
@@ -57,8 +57,8 @@ func (s *carService) CreateCar(ctx context.Context, req dto.CreateCarRequest) (*
 	return car, nil
 }
 
-func (s *carService) GetAllCars(ctx context.Context, category string, availableOnly bool) ([]model.Car, error) {
-	return s.carRepo.GetAll(ctx, category, availableOnly)
+func (s *carService) GetAllCars(ctx context.Context, filter repository.CarFilter) ([]model.Car, int, error) {
+	return s.carRepo.GetAll(ctx, filter)
 }
 
 func (s *carService) GetCarByID(ctx context.Context, id uuid.UUID) (*model.Car, error) {

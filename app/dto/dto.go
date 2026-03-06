@@ -1,6 +1,15 @@
 package dto
 
-import "github.com/google/uuid"
+import (
+	"car_rental_miniproject/model"
+	"github.com/google/uuid"
+)
+
+// PaginatedCarsResponse represents a paginated list of cars
+type PaginatedCarsResponse struct {
+	Cars  []model.Car `json:"cars"`
+	Total int         `json:"total"`
+}
 
 // FieldError represents a single field validation error
 type FieldError struct {
