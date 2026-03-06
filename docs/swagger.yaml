@@ -1,0 +1,1007 @@
+basePath: /
+definitions:
+  dto.APIResponse:
+    description: Standard API response wrapper
+    properties:
+      data: {}
+      error:
+        type: string
+      errors:
+        items:
+          $ref: '#/definitions/dto.FieldError'
+        type: array
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  dto.BookingReportResponse:
+    description: Comprehensive booking report for user
+    properties:
+      active_rentals:
+        type: integer
+      current_deposit:
+        type: number
+      email:
+        type: string
+      rental_histories:
+        items:
+          $ref: '#/definitions/dto.RentalHistoryResponse'
+        type: array
+      total_rentals:
+        type: integer
+      total_spent:
+        type: number
+      user_id:
+        type: string
+    type: object
+  dto.ChangePasswordRequest:
+    description: Request to change password for authenticated user
+    properties:
+      new_password:
+        minLength: 8
+        type: string
+      old_password:
+        type: string
+    required:
+    - new_password
+    - old_password
+    type: object
+  dto.CreateCarRequest:
+    description: Request to create a new car
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      image_url:
+        type: string
+      name:
+        type: string
+      rental_costs:
+        type: number
+      stock_availability:
+        minimum: 0
+        type: integer
+    required:
+    - category
+    - description
+    - name
+    - rental_costs
+    - stock_availability
+    type: object
+  dto.FieldError:
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+    type: object
+  dto.ForgotPasswordRequest:
+    description: Request to reset password
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  dto.LoginRequest:
+    description: User login request
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.LoginResponse:
+    description: Login response containing JWT token and user info
+    properties:
+      expires_in:
+        type: integer
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/dto.UserResponse'
+    type: object
+  dto.RefreshTokenRequest:
+    description: Request to refresh JWT token
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  dto.RegisterRequest:
+    description: User registration request
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.RentCarRequest:
+    description: Request to rent a car
+    properties:
+      car_id:
+        type: string
+      rental_days:
+        type: integer
+    required:
+    - car_id
+    - rental_days
+    type: object
+  dto.RentalHistoryResponse:
+    description: Rental history information returned in API responses
+    properties:
+      car_id:
+        type: string
+      car_name:
+        type: string
+      id:
+        type: string
+      payment_status:
+        type: string
+      payment_url:
+        type: string
+      rental_date:
+        type: string
+      return_date:
+        type: string
+      status:
+        type: string
+      total_cost:
+        type: number
+      user_id:
+        type: string
+    type: object
+  dto.ResetPasswordRequest:
+    description: Request to set new password with reset token
+    properties:
+      new_password:
+        minLength: 8
+        type: string
+      token:
+        type: string
+    required:
+    - new_password
+    - token
+    type: object
+  dto.TopUpRequest:
+    description: Request to add funds to user deposit
+    properties:
+      amount:
+        type: number
+    required:
+    - amount
+    type: object
+  dto.UpdateCarRequest:
+    description: Request to update car information
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      image_url:
+        type: string
+      name:
+        type: string
+      rental_costs:
+        type: number
+      stock_availability:
+        minimum: 0
+        type: integer
+    type: object
+  dto.UpdateProfileRequest:
+    description: Request to update user profile
+    properties:
+      email:
+        type: string
+    type: object
+  dto.UserResponse:
+    description: User information returned in API responses
+    properties:
+      deposit_amount:
+        type: number
+      email:
+        type: string
+      id:
+        type: string
+      role:
+        type: string
+    type: object
+  model.Car:
+    description: Car entity for rental with availability and pricing
+    properties:
+      availability:
+        type: boolean
+      category:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      name:
+        type: string
+      rental_costs:
+        type: number
+      stock_availability:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  model.RentalHistory:
+    description: Rental history tracking user car rentals
+    properties:
+      car_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      payment_status:
+        description: pending, paid, failed
+        type: string
+      payment_url:
+        type: string
+      rental_date:
+        type: string
+      return_date:
+        type: string
+      status:
+        description: pending, active, completed, cancelled
+        type: string
+      total_cost:
+        type: number
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  model.TopUpTransaction:
+    description: Transaction record for user deposit top-ups
+    properties:
+      amount:
+        type: number
+      created_at:
+        type: string
+      id:
+        type: string
+      payment_method:
+        type: string
+      payment_url:
+        type: string
+      status:
+        description: pending, completed, failed
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@rentalcar.com
+    name: API Support
+  description: A REST API for rental car service built with Go, Echo, PostgreSQL,
+    and JWT authentication
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Rental Car API
+  version: "1.0"
+paths:
+  /api/auth/change-password:
+    post:
+      consumes:
+      - application/json
+      description: Change password for authenticated user
+      parameters:
+      - description: Old and new password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Change password
+      tags:
+      - auth
+  /api/auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Request a password reset email
+      parameters:
+      - description: Email address
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ForgotPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Forgot password
+      tags:
+      - auth
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Login with email and password to get JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Login user
+      tags:
+      - auth
+  /api/auth/logout:
+    post:
+      description: Logout user (client should remove stored token)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout user
+      tags:
+      - auth
+  /api/auth/me:
+    get:
+      description: Get current authenticated user information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - auth
+  /api/auth/profile:
+    put:
+      consumes:
+      - application/json
+      description: Update user profile information
+      parameters:
+      - description: Profile update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update profile
+      tags:
+      - auth
+  /api/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh JWT token using a valid token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Refresh JWT token
+      tags:
+      - auth
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user with email and password
+      parameters:
+      - description: Registration details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /api/auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Reset password using a valid reset token
+      parameters:
+      - description: Reset token and new password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Reset password
+      tags:
+      - auth
+  /api/cars:
+    get:
+      description: Get list of all available cars with optional filtering
+      parameters:
+      - description: Filter by category
+        in: query
+        name: category
+        type: string
+      - description: Filter by availability
+        in: query
+        name: available
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Car'
+                  type: array
+              type: object
+      summary: Get all cars
+      tags:
+      - cars
+    post:
+      consumes:
+      - application/json
+      description: Create a new car (admin only)
+      parameters:
+      - description: Car details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateCarRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Car'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new car
+      tags:
+      - cars
+  /api/cars/:id:
+    delete:
+      description: Delete a car by ID (admin only)
+      parameters:
+      - description: Car ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a car
+      tags:
+      - cars
+    get:
+      description: Get details of a specific car by ID
+      parameters:
+      - description: Car ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Car'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Get car by ID
+      tags:
+      - cars
+    put:
+      consumes:
+      - application/json
+      description: Update an existing car (admin only)
+      parameters:
+      - description: Car ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Car details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateCarRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Car'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a car
+      tags:
+      - cars
+  /api/rentals:
+    post:
+      consumes:
+      - application/json
+      description: Rent a car using user's deposit
+      parameters:
+      - description: Rental details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RentCarRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.RentalHistory'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Rent a car
+      tags:
+      - rentals
+  /api/rentals/:id/cancel:
+    post:
+      description: Cancel a pending rental
+      parameters:
+      - description: Rental ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Cancel rental
+      tags:
+      - rentals
+  /api/rentals/:id/confirm-payment:
+    post:
+      description: Confirm payment for a rental (callback from payment gateway)
+      parameters:
+      - description: Rental ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Confirm payment
+      tags:
+      - rentals
+  /api/rentals/booking-report:
+    get:
+      description: Get comprehensive booking report for authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.BookingReportResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get booking report
+      tags:
+      - rentals
+  /api/rentals/my:
+    get:
+      description: Get rental history for authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.RentalHistoryResponse'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my rentals
+      tags:
+      - rentals
+  /api/topup:
+    post:
+      consumes:
+      - application/json
+      description: Add funds to user deposit balance
+      parameters:
+      - description: Top-up amount
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TopUpRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.TopUpTransaction'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Top up deposit
+      tags:
+      - topup
+  /api/topup/history:
+    get:
+      description: Get top-up transaction history for authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/dto.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.TopUpTransaction'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get top-up history
+      tags:
+      - topup
+  /api/webhook/payment:
+    post:
+      consumes:
+      - application/json
+      description: Receive payment notifications from Xendit
+      parameters:
+      - description: Payment notification from Xendit
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.APIResponse'
+      summary: Payment notification webhook
+      tags:
+      - webhook
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

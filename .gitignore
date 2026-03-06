@@ -44,7 +44,6 @@ tmp/
 temp/
 
 # Swagger generated files (if regenerating)
-docs/swagger.yaml
 docs/swagger.json
 
 present.txt
