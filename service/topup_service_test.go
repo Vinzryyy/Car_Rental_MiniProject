@@ -61,13 +61,13 @@ func (m *MockTopUpRepository) Update(ctx context.Context, transaction *model.Top
 }
 
 func TestTopUpService_CreateTopUp(t *testing.T) {
-	mockTopUpRepo := new(MockTopUpRepository)
-	mockUserRepo := new(MockUserRepository)
-	mockPaymentService := new(MockPaymentService)
-	
-	service := NewTopUpService(mockTopUpRepo, mockUserRepo, mockPaymentService, nil)
-
 	t.Run("successful top-up request", func(t *testing.T) {
+		mockPool := new(MockDBPool)
+		mockTopUpRepo := new(MockTopUpRepository)
+		mockUserRepo := new(MockUserRepository)
+		mockPaymentService := new(MockPaymentService)
+		service := NewTopUpService(mockPool, mockTopUpRepo, mockUserRepo, mockPaymentService, nil)
+
 		userID := uuid.New()
 		req := dto.TopUpRequest{Amount: 500.00}
 		user := &model.User{ID: userID, Email: "test@example.com"}
@@ -83,6 +83,7 @@ func TestTopUpService_CreateTopUp(t *testing.T) {
 		assert.NotNil(t, transaction)
 		assert.Equal(t, 500.00, transaction.Amount)
 		assert.Equal(t, "pending", transaction.Status)
+		assert.Equal(t, "https://payment.url", transaction.PaymentURL)
 		mockUserRepo.AssertExpectations(t)
 		mockTopUpRepo.AssertExpectations(t)
 		mockPaymentService.AssertExpectations(t)
@@ -90,12 +91,12 @@ func TestTopUpService_CreateTopUp(t *testing.T) {
 }
 
 func TestTopUpService_ConfirmTopUp(t *testing.T) {
-	mockTopUpRepo := new(MockTopUpRepository)
-	mockUserRepo := new(MockUserRepository)
-	
-	service := NewTopUpService(mockTopUpRepo, mockUserRepo, nil, nil)
-
 	t.Run("successful top-up confirmation", func(t *testing.T) {
+		mockPool := new(MockDBPool)
+		mockTopUpRepo := new(MockTopUpRepository)
+		mockUserRepo := new(MockUserRepository)
+		service := NewTopUpService(mockPool, mockTopUpRepo, mockUserRepo, nil, nil)
+
 		txID := uuid.New()
 		userID := uuid.New()
 		transaction := &model.TopUpTransaction{
@@ -105,6 +106,14 @@ func TestTopUpService_ConfirmTopUp(t *testing.T) {
 			Status: "pending",
 		}
 
+		mockTx := new(MockTx)
+		mockPool.On("Begin", mock.Anything).Return(mockTx, nil)
+		mockTx.On("Rollback", mock.Anything).Return(nil)
+		mockTx.On("Commit", mock.Anything).Return(nil)
+
+		mockTopUpRepo.On("WithTx", mockTx).Return(mockTopUpRepo)
+		mockUserRepo.On("WithTx", mockTx).Return(mockUserRepo)
+
 		mockTopUpRepo.On("GetByID", mock.Anything, txID).Return(transaction, nil)
 		mockUserRepo.On("UpdateDeposit", mock.Anything, userID, 500.00).Return(nil)
 		mockTopUpRepo.On("UpdateStatus", mock.Anything, txID, "completed").Return(nil)
@@ -112,19 +121,34 @@ func TestTopUpService_ConfirmTopUp(t *testing.T) {
 		err := service.ConfirmTopUp(context.Background(), txID)
 
 		assert.NoError(t, err)
+		mockPool.AssertExpectations(t)
 		mockTopUpRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 	})
 
 	t.Run("confirmation fails if already completed", func(t *testing.T) {
+		mockPool := new(MockDBPool)
+		mockTopUpRepo := new(MockTopUpRepository)
+		mockUserRepo := new(MockUserRepository)
+		service := NewTopUpService(mockPool, mockTopUpRepo, mockUserRepo, nil, nil)
+
 		txID := uuid.New()
 		transaction := &model.TopUpTransaction{ID: txID, Status: "completed"}
+
+		mockTx := new(MockTx)
+		mockPool.On("Begin", mock.Anything).Return(mockTx, nil)
+		mockTx.On("Rollback", mock.Anything).Return(nil)
+
+		mockTopUpRepo.On("WithTx", mockTx).Return(mockTopUpRepo)
+		mockUserRepo.On("WithTx", mockTx).Return(mockUserRepo)
 
 		mockTopUpRepo.On("GetByID", mock.Anything, txID).Return(transaction, nil)
 
 		err := service.ConfirmTopUp(context.Background(), txID)
 
 		assert.NoError(t, err) // Should return nil (idempotent)
+		mockPool.AssertExpectations(t)
 		mockTopUpRepo.AssertExpectations(t)
+		mockUserRepo.AssertExpectations(t)
 	})
 }

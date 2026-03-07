@@ -323,7 +323,7 @@ func TestRentalService_RentCar(t *testing.T) {
 		mockCarRepo.AssertExpectations(t)
 	})
 
-	t.Run("rental fails if insufficient deposit", func(t *testing.T) {
+	t.Run("successful rental even with insufficient deposit", func(t *testing.T) {
 		mockPool := new(MockDBPool)
 		mockRentalRepo := new(MockRentalRepository)
 		mockCarRepo := new(MockCarRepository)
@@ -335,12 +335,13 @@ func TestRentalService_RentCar(t *testing.T) {
 		carID := uuid.New()
 		req := dto.RentCarRequest{CarID: carID, RentalDays: 5}
 
-		car := &model.Car{ID: carID, Availability: true, StockAvailability: 5, RentalCosts: 100.00}
-		user := &model.User{ID: userID, DepositAmount: 50.00}
+		car := &model.Car{ID: carID, Name: "Expensive Car", Availability: true, StockAvailability: 5, RentalCosts: 100.00}
+		user := &model.User{ID: userID, Email: "poor@example.com", DepositAmount: 50.00}
 
 		mockTx := new(MockTx)
 		mockPool.On("Begin", mock.Anything).Return(mockTx, nil)
 		mockTx.On("Rollback", mock.Anything).Return(nil)
+		mockTx.On("Commit", mock.Anything).Return(nil)
 
 		mockCarRepo.On("WithTx", mockTx).Return(mockCarRepo)
 		mockRentalRepo.On("WithTx", mockTx).Return(mockRentalRepo)
@@ -348,14 +349,18 @@ func TestRentalService_RentCar(t *testing.T) {
 
 		mockCarRepo.On("GetByIDForUpdate", mock.Anything, carID).Return(car, nil)
 		mockUserRepo.On("GetByID", mock.Anything, userID).Return(user, nil)
+		mockCarRepo.On("DecreaseStock", mock.Anything, carID).Return(nil)
+		mockRentalRepo.On("Create", mock.Anything, mock.AnythingOfType("*model.RentalHistory")).Return(nil)
+		mockPaymentService.On("CreateInvoice", mock.Anything, mock.Anything, 500.00, user.Email, mock.Anything).Return("https://payment.url", nil)
+		mockRentalRepo.On("UpdatePaymentURL", mock.Anything, mock.Anything, "https://payment.url").Return(nil)
 
 		rental, err := service.RentCar(context.Background(), userID, req)
 
-		assert.Error(t, err)
-		assert.Nil(t, rental)
-		assert.Equal(t, ErrInsufficientDeposit, err)
+		assert.NoError(t, err)
+		assert.NotNil(t, rental)
+		assert.Equal(t, 500.00, rental.TotalCost)
+		assert.Equal(t, "pending", rental.Status)
 		mockPool.AssertExpectations(t)
-		mockCarRepo.AssertExpectations(t)
 		mockUserRepo.AssertExpectations(t)
 	})
 }
