@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"car_rental_miniproject/app/config"
 )
+
 var (
 	ErrPaymentGatewayUnavailable = errors.New("payment gateway unavailable")
 	ErrPaymentFailed             = errors.New("payment failed")
@@ -44,43 +47,43 @@ type xenditPaymentService struct {
 
 // InvoiceRequest represents the request to Xendit Invoice API
 type InvoiceRequest struct {
-	ExternalID     string  `json:"external_id"`
-	Amount         float64 `json:"amount"`
-	PayerEmail     string  `json:"payer_email,omitempty"`
-	Description    string  `json:"description,omitempty"`
-	InvoiceDuration int64  `json:"invoice_duration,omitempty"`
+	ExternalID         string  `json:"external_id"`
+	Amount             float64 `json:"amount"`
+	PayerEmail         string  `json:"payer_email,omitempty"`
+	Description        string  `json:"description,omitempty"`
+	InvoiceDuration    int64   `json:"invoice_duration,omitempty"`
+	SuccessRedirectURL string  `json:"success_redirect_url,omitempty"`
+	FailureRedirectURL string  `json:"failure_redirect_url,omitempty"`
 }
 
 // InvoiceResponse represents the response from Xendit Invoice API
 type InvoiceResponse struct {
-	ID            string  `json:"id"`
-	ExternalID    string  `json:"external_id"`
-	Amount        float64 `json:"amount"`
-	PayerEmail    string  `json:"payer_email"`
-	Description   string  `json:"description"`
-	InvoiceURL    string  `json:"invoice_url"`
-	Status        string  `json:"status"`
+	ID          string  `json:"id"`
+	ExternalID  string  `json:"external_id"`
+	Amount      float64 `json:"amount"`
+	PayerEmail  string  `json:"payer_email"`
+	Description string  `json:"description"`
+	InvoiceURL  string  `json:"invoice_url"`
+	Status      string  `json:"status"`
 }
 
 // PaymentNotification represents Xendit payment notification (webhook)
 type PaymentNotification struct {
-	OrderID         string  `json:"external_id"`
+	OrderID           string  `json:"external_id"`
 	TransactionStatus string  `json:"status"`
-	GrossAmount     float64 `json:"amount"`
-	PaymentType     string  `json:"payment_method"`
-	InvoiceID       string  `json:"id"`
+	GrossAmount       float64 `json:"amount"`
+	PaymentType       string  `json:"payment_method"`
+	InvoiceID         string  `json:"id"`
 }
 
 // NewXenditPaymentService creates a new Xendit payment service
 func NewXenditPaymentService(cfg *config.Config) PaymentService {
-	isProd := cfg.Server.Env == "production"
-	
 	return &xenditPaymentService{
 		config: &XenditConfig{
-			SecretKey:     getEnv("XENDIT_SECRET_KEY", ""),
-			PublicKey:     getEnv("XENDIT_PUBLIC_KEY", ""),
-			CallbackToken: getEnv("XENDIT_CALLBACK_TOKEN", ""),
-			IsProduction:  isProd,
+			SecretKey:     cfg.Payment.XenditSecretKey,
+			PublicKey:     cfg.Payment.XenditPublicKey,
+			CallbackToken: cfg.Payment.XenditCallbackToken,
+			IsProduction:  cfg.Payment.IsProduction,
 		},
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -90,17 +93,19 @@ func NewXenditPaymentService(cfg *config.Config) PaymentService {
 
 // CreateInvoice creates a payment invoice using Xendit Invoice API
 func (s *xenditPaymentService) CreateInvoice(ctx context.Context, orderID string, amount float64, userEmail string, description string) (string, error) {
-	if s.config.SecretKey == "" {
-		// Return mock URL for development without API key
+	if s.config.SecretKey == "" || s.config.SecretKey == "xnd_development_..." {
+		log.Printf("XENDIT_SECRET_KEY not set or placeholder. Returning mock URL for order %s", orderID)
 		return fmt.Sprintf("https://dashboard.sandbox.xendit.co/invoices/%s", orderID), nil
 	}
 
 	req := InvoiceRequest{
-		ExternalID:      orderID,
-		Amount:          amount,
-		PayerEmail:      userEmail,
-		Description:     description,
-		InvoiceDuration: 604800, // 7 days in seconds
+		ExternalID:         orderID,
+		Amount:             amount,
+		PayerEmail:         userEmail,
+		Description:        description,
+		InvoiceDuration:    604800, // 7 days in seconds
+		SuccessRedirectURL: "http://localhost:8080/api/docs",
+		FailureRedirectURL: "http://localhost:8080/api/docs",
 	}
 
 	reqBody, err := json.Marshal(req)
@@ -111,7 +116,7 @@ func (s *xenditPaymentService) CreateInvoice(ctx context.Context, orderID string
 	// Xendit API endpoint
 	baseURL := "https://api.xendit.co"
 	url := fmt.Sprintf("%s/v2/invoices", baseURL)
-	
+
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
@@ -125,11 +130,14 @@ func (s *xenditPaymentService) CreateInvoice(ctx context.Context, orderID string
 
 	resp, err := s.httpClient.Do(httpReq)
 	if err != nil {
+		log.Printf("Xendit API call failed: %v", err)
 		return "", fmt.Errorf("failed to call payment gateway: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("Xendit API returned error %d: %s", resp.StatusCode, string(body))
 		return "", fmt.Errorf("payment gateway returned status %d", resp.StatusCode)
 	}
 
@@ -138,6 +146,7 @@ func (s *xenditPaymentService) CreateInvoice(ctx context.Context, orderID string
 		return "", fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	log.Printf("Successfully created Xendit invoice for %s: %s", orderID, invoiceResp.InvoiceURL)
 	return invoiceResp.InvoiceURL, nil
 }
 
@@ -154,7 +163,7 @@ func (s *xenditPaymentService) CheckPaymentStatus(ctx context.Context, orderID s
 	// Xendit API endpoint
 	baseURL := "https://api.xendit.co"
 	url := fmt.Sprintf("%s/v2/invoices/%s", baseURL, orderID)
-	
+
 	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)

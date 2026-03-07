@@ -40,9 +40,10 @@ type SupabaseConfig struct {
 }
 
 type PaymentConfig struct {
-	XenditSecretKey string
-	XenditPublicKey string
-	IsProduction      bool
+	XenditSecretKey     string
+	XenditPublicKey      string
+	XenditCallbackToken string
+	IsProduction        bool
 }
 
 type EmailConfig struct {
@@ -76,9 +77,10 @@ func Load() *Config {
 			Key:    getEnv("SUPABASE_KEY", ""),
 		},
 		Payment: PaymentConfig{
-			XenditSecretKey:   getEnv("XENDIT_SECRET_KEY", ""),
-			XenditPublicKey:   getEnv("XENDIT_PUBLIC_KEY", ""),
-			IsProduction:      getEnv("ENV", "development") == "production",
+			XenditSecretKey:     getEnv("XENDIT_SECRET_KEY", ""),
+			XenditPublicKey:      getEnv("XENDIT_PUBLIC_KEY", ""),
+			XenditCallbackToken: getEnv("XENDIT_CALLBACK_TOKEN", ""),
+			IsProduction:        getEnv("ENV", "development") == "production",
 		},
 		Email: EmailConfig{
 			GmailAPIKey:             getEnv("GMAIL_API_KEY", ""),
