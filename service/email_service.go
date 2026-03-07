@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"html/template"
+	"log"
 	"net/mail"
 
 	"car_rental_miniproject/app/config"
@@ -77,6 +78,7 @@ type PasswordResetData struct {
 func NewEmailService(cfg *config.Config) *EmailService {
 	// Check if Gmail API is enabled in config
 	if !cfg.Email.IsEnabled {
+		log.Println("Email service is explicitly disabled in config")
 		return &EmailService{
 			isEnabled: false,
 			fromEmail: cfg.Email.FromEmail,
@@ -93,21 +95,25 @@ func NewEmailService(cfg *config.Config) *EmailService {
 	isEnabled := false
 
 	if serviceAccount != "" {
-		// Use service account for sending emails
+		log.Println("Initializing Email Service with Service Account...")
 		gmailSvc, err = gmail.NewService(context.Background(), option.WithCredentialsJSON([]byte(serviceAccount)))
-		if err == nil {
+		if err != nil {
+			log.Printf("Failed to initialize Gmail service with Service Account: %v", err)
+		} else {
 			isEnabled = true
+			log.Println("Gmail service initialized successfully with Service Account")
 		}
 	} else if apiKey != "" {
-		// Use API key (limited functionality)
+		log.Println("Initializing Email Service with API Key...")
 		gmailSvc, err = gmail.NewService(context.Background(), option.WithAPIKey(apiKey))
-		if err == nil {
+		if err != nil {
+			log.Printf("Failed to initialize Gmail service with API Key: %v", err)
+		} else {
 			isEnabled = true
+			log.Println("Gmail service initialized successfully with API Key")
 		}
-	} else if cfg.Server.Env == "test" || cfg.Server.Env == "development" {
-		// Allow "enabled" state without real credentials for testing/dev if needed
-		// But usually we want it disabled if no credentials
-		isEnabled = false
+	} else {
+		log.Println("Email enabled but no Gmail credentials found (API Key or Service Account)")
 	}
 
 	fromEmail := cfg.Email.FromEmail
@@ -182,7 +188,7 @@ func (s *EmailService) renderTemplate(name string, data interface{}) (string, er
 // SendEmail sends an email using Gmail API
 func (s *EmailService) SendEmail(ctx context.Context, msg EmailMessage) error {
 	if !s.isEnabled {
-		// Log but don't fail - email is optional
+		log.Printf("Email service is disabled. Would have sent email to %s with subject: %s", msg.To, msg.Subject)
 		return nil
 	}
 
@@ -209,11 +215,14 @@ func (s *EmailService) SendEmail(ctx context.Context, msg EmailMessage) error {
 	}
 
 	// Send via Gmail API
-	_, err := s.gmailService.Users.Messages.Send("me", gmailMsg).Context(ctx).Do()
+	res, err := s.gmailService.Users.Messages.Send("me", gmailMsg).Context(ctx).Do()
 	if err != nil {
+		log.Printf("CRITICAL EMAIL ERROR: Failed to send email to %s. Error: %v", msg.To, err)
+		log.Printf("DEBUG INFO: From=%s, FromName=%s, isEnabled=%v", s.fromEmail, s.fromName, s.isEnabled)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
+	log.Printf("Email sent successfully to %s. Message ID: %s", msg.To, res.Id)
 	return nil
 }
 
