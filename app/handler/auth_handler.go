@@ -49,7 +49,7 @@ func (h *AuthHandler) Register(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
 			Success: false,
 			Message: "validation failed",
-			Error:   err.Error(),
+			Errors:  middleware.FormatValidationErrors(err),
 		})
 	}
 
@@ -106,7 +106,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
 			Success: false,
 			Message: "validation failed",
-			Error:   err.Error(),
+			Errors:  middleware.FormatValidationErrors(err),
 		})
 	}
 
@@ -160,7 +160,7 @@ func (h *AuthHandler) RefreshToken(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
 			Success: false,
 			Message: "validation failed",
-			Error:   err.Error(),
+			Errors:  middleware.FormatValidationErrors(err),
 		})
 	}
 
@@ -278,7 +278,7 @@ func (h *AuthHandler) ForgotPassword(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
 			Success: false,
 			Message: "validation failed",
-			Error:   err.Error(),
+			Errors:  middleware.FormatValidationErrors(err),
 		})
 	}
 
@@ -323,7 +323,7 @@ func (h *AuthHandler) ResetPassword(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
 			Success: false,
 			Message: "validation failed",
-			Error:   err.Error(),
+			Errors:  middleware.FormatValidationErrors(err),
 		})
 	}
 
@@ -375,7 +375,7 @@ func (h *AuthHandler) ChangePassword(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
 			Success: false,
 			Message: "validation failed",
-			Error:   err.Error(),
+			Errors:  middleware.FormatValidationErrors(err),
 		})
 	}
 
@@ -438,7 +438,7 @@ func (h *AuthHandler) UpdateProfile(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, dto.APIResponse{
 			Success: false,
 			Message: "validation failed",
-			Error:   err.Error(),
+			Errors:  middleware.FormatValidationErrors(err),
 		})
 	}
 

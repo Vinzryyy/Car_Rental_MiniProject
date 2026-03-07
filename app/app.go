@@ -13,6 +13,7 @@ import (
 	echoSwagger "github.com/swaggo/echo-swagger"
 
 	"car_rental_miniproject/app/config"
+	"car_rental_miniproject/app/dto"
 	"car_rental_miniproject/app/handler"
 	"car_rental_miniproject/app/middleware"
 	"car_rental_miniproject/database"
@@ -45,6 +46,23 @@ func NewApp(cfg *config.Config) (*App, error) {
 
 	// Set custom validator
 	e.Validator = middleware.NewCustomValidator()
+
+	// Global error handler
+	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		code := http.StatusInternalServerError
+		message := "Internal Server Error"
+
+		if he, ok := err.(*echo.HTTPError); ok {
+			code = he.Code
+			message = fmt.Sprintf("%v", he.Message)
+		}
+
+		_ = c.JSON(code, dto.APIResponse{
+			Success: false,
+			Message: message,
+			Error:   err.Error(),
+		})
+	}
 
 	// Initialize database (non-blocking)
 	var db *database.Database

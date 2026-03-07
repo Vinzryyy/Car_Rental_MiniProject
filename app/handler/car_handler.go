@@ -263,6 +263,14 @@ func (h *CarHandler) UpdateCar(c echo.Context) error {
 		})
 	}
 
+	if err := h.validator.Validate(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, dto.APIResponse{
+			Success: false,
+			Message: "validation failed",
+			Errors:  middleware.FormatValidationErrors(err),
+		})
+	}
+
 	car, err := h.carService.UpdateCar(c.Request().Context(), id, req)
 	if err != nil {
 		if errors.Is(err, service.ErrCarNotFound) {
