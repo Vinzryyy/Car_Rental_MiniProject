@@ -81,15 +81,16 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 	// Calculate total cost
 	totalCost := car.RentalCosts * float64(req.RentalDays)
 
-	// Check user deposit
+	// Get user details
 	user, err := userRepoTx.GetByID(ctx, userID)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
 
-	if user.DepositAmount < totalCost {
-		return nil, ErrInsufficientDeposit
-	}
+	// Note: We no longer fail here if deposit is insufficient.
+	// Instead, we allow the rental to be created as 'pending' 
+	// and the user can pay via the generated Xendit payment link.
+	// If they want to use deposit, they can call ConfirmPayment later.
 
 	// Decrease car stock
 	if err := carRepoTx.DecreaseStock(ctx, req.CarID); err != nil {

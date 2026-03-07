@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"car_rental_miniproject/app/dto"
@@ -63,15 +64,20 @@ func (s *topUpService) CreateTopUp(ctx context.Context, userID uuid.UUID, req dt
 	description := fmt.Sprintf("Deposit top-up for account %s", user.Email)
 	paymentURL, err := s.paymentService.CreateInvoice(ctx, orderID, req.Amount, user.Email, description)
 	if err != nil {
+		log.Printf("Failed to generate payment invoice for top-up %s: %v", transaction.ID, err)
 		// Continue without payment URL if gateway fails
 		paymentURL = ""
 	}
 
 	// Update transaction with payment URL
 	transaction.PaymentURL = paymentURL
+	transaction.UpdatedAt = time.Now()
 	if err := s.topUpRepo.Update(ctx, transaction); err != nil {
 		return nil, err
 	}
+
+	// Important: The object being returned already has the paymentURL set 
+	// because we assigned it above.
 
 	// Send top-up confirmation email (non-blocking)
 	if s.emailService != nil && s.emailService.IsEnabled() {
