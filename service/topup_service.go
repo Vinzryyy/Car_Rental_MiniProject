@@ -22,14 +22,16 @@ type TopUpService interface {
 }
 
 type topUpService struct {
+	pool             repository.DBPool
 	topUpRepo        repository.TopUpRepository
 	userRepo         repository.UserRepository
 	paymentService   PaymentService
 	emailService     *EmailService
 }
 
-func NewTopUpService(topUpRepo repository.TopUpRepository, userRepo repository.UserRepository, paymentService PaymentService, emailService *EmailService) TopUpService {
+func NewTopUpService(pool repository.DBPool, topUpRepo repository.TopUpRepository, userRepo repository.UserRepository, paymentService PaymentService, emailService *EmailService) TopUpService {
 	return &topUpService{
+		pool:           pool,
 		topUpRepo:      topUpRepo,
 		userRepo:       userRepo,
 		paymentService: paymentService,
@@ -104,7 +106,18 @@ func (s *topUpService) GetTopUpsByUserID(ctx context.Context, userID uuid.UUID) 
 }
 
 func (s *topUpService) ConfirmTopUp(ctx context.Context, transactionID uuid.UUID) error {
-	transaction, err := s.topUpRepo.GetByID(ctx, transactionID)
+	// Start transaction
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Create repository instances with transaction
+	topUpRepoTx := s.topUpRepo.WithTx(tx)
+	userRepoTx := s.userRepo.WithTx(tx)
+
+	transaction, err := topUpRepoTx.GetByID(ctx, transactionID)
 	if err != nil {
 		return err
 	}
@@ -119,12 +132,17 @@ func (s *topUpService) ConfirmTopUp(ctx context.Context, transactionID uuid.UUID
 	}
 
 	// Update user deposit
-	if err := s.userRepo.UpdateDeposit(ctx, transaction.UserID, transaction.Amount); err != nil {
+	if err := userRepoTx.UpdateDeposit(ctx, transaction.UserID, transaction.Amount); err != nil {
 		return err
 	}
 
 	// Update transaction status
-	return s.topUpRepo.UpdateStatus(ctx, transactionID, "completed")
+	if err := topUpRepoTx.UpdateStatus(ctx, transactionID, "completed"); err != nil {
+		return err
+	}
+
+	// Commit transaction
+	return tx.Commit(ctx)
 }
 
 func (s *topUpService) CancelTopUp(ctx context.Context, transactionID uuid.UUID) error {

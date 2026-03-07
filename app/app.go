@@ -82,7 +82,7 @@ func NewApp(cfg *config.Config) (*App, error) {
 		imageService, _ := service.NewImageService()
 		paymentService := service.NewXenditPaymentService(cfg)
 		rentalService := service.NewRentalService(db.Pool, rentalRepo, carRepo, userRepo, paymentService, emailService)
-		topUpService := service.NewTopUpService(topUpRepo, userRepo, paymentService, emailService)
+		topUpService := service.NewTopUpService(db.Pool, topUpRepo, userRepo, paymentService, emailService)
 
 		// Initialize middleware
 		jwtMiddleware := middleware.NewJWTMiddleware(authService, &cfg.JWT)

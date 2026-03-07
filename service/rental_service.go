@@ -214,7 +214,18 @@ func (s *rentalService) GetBookingReport(ctx context.Context, userID uuid.UUID) 
 }
 
 func (s *rentalService) ConfirmPayment(ctx context.Context, rentalID uuid.UUID, userID uuid.UUID) error {
-	rental, err := s.rentalRepo.GetByID(ctx, rentalID)
+	// Start transaction
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	// Create repository instances with transaction
+	rentalRepoTx := s.rentalRepo.WithTx(tx)
+	userRepoTx := s.userRepo.WithTx(tx)
+
+	rental, err := rentalRepoTx.GetByID(ctx, rentalID)
 	if err != nil {
 		return ErrRentalNotFound
 	}
@@ -230,12 +241,17 @@ func (s *rentalService) ConfirmPayment(ctx context.Context, rentalID uuid.UUID, 
 	}
 
 	// Deduct deposit from user
-	if err := s.userRepo.UpdateDeposit(ctx, rental.UserID, -rental.TotalCost); err != nil {
+	if err := userRepoTx.UpdateDeposit(ctx, rental.UserID, -rental.TotalCost); err != nil {
 		return err
 	}
 
 	// Update rental status
-	return s.rentalRepo.UpdateStatus(ctx, rentalID, "active", "paid")
+	if err := rentalRepoTx.UpdateStatus(ctx, rentalID, "active", "paid"); err != nil {
+		return err
+	}
+
+	// Commit transaction
+	return tx.Commit(ctx)
 }
 
 func (s *rentalService) ConfirmExternalPayment(ctx context.Context, rentalID uuid.UUID) error {

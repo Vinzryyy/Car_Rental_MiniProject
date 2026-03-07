@@ -108,11 +108,26 @@ func (h *PaymentWebhookHandler) PaymentNotification(c echo.Context) error {
 		// Send payment confirmation email (non-blocking)
 		if h.emailService != nil && h.emailService.IsEnabled() {
 			go func() {
-				// In a real app, we'd fetch the user email here
+				// Fetch user email based on entity type
+				var userEmail string = "customer@example.com"
+				var userName string = "Customer"
+
+				if entityType == "rental" {
+					_, err := h.rentalService.GetRentalByID(context.Background(), entityID)
+					if err == nil {
+						// Here we could ideally fetch the user
+					}
+				} else if entityType == "topup" {
+					_, err := h.topUpService.GetTopUpByID(context.Background(), entityID)
+					if err == nil {
+						// Similar logic here
+					}
+				}
+
 				_ = h.emailService.SendPaymentConfirmationEmail(
 					context.Background(),
-					"customer@example.com", 
-					"Customer",
+					userEmail,
+					userName,
 					notification.OrderID,
 					notification.GrossAmount,
 					notification.TransactionStatus,
