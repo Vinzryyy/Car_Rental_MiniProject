@@ -65,7 +65,7 @@ func (r *carRepository) GetAll(ctx context.Context, filter CarFilter) ([]model.C
 	countQuery := `SELECT COUNT(*) FROM cars WHERE 1=1`
 	
 	// Base query for fetching data
-	dataQuery := `SELECT id, name, availability, stock_availability, rental_costs, category, description, image_url, created_at, updated_at FROM cars WHERE 1=1`
+	dataQuery := `SELECT id, name, availability, stock_availability, rental_costs, category, COALESCE(description, ''), COALESCE(image_url, ''), created_at, updated_at FROM cars WHERE 1=1`
 	
 	whereClause := ""
 	args := []interface{}{}
@@ -157,7 +157,7 @@ func (r *carRepository) GetAll(ctx context.Context, filter CarFilter) ([]model.C
 }
 
 func (r *carRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Car, error) {
-	query := `SELECT id, name, availability, stock_availability, rental_costs, category, description, image_url, created_at, updated_at FROM cars WHERE id = $1`
+	query := `SELECT id, name, availability, stock_availability, rental_costs, category, COALESCE(description, ''), COALESCE(image_url, ''), created_at, updated_at FROM cars WHERE id = $1`
 	car := &model.Car{}
 	err := r.getQuerier().QueryRow(ctx, query, id).Scan(&car.ID, &car.Name, &car.Availability, &car.StockAvailability, &car.RentalCosts, &car.Category, &car.Description, &car.ImageURL, &car.CreatedAt, &car.UpdatedAt)
 	if err != nil {
@@ -167,7 +167,7 @@ func (r *carRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Car, 
 }
 
 func (r *carRepository) GetByIDForUpdate(ctx context.Context, id uuid.UUID) (*model.Car, error) {
-	query := `SELECT id, name, availability, stock_availability, rental_costs, category, description, image_url, created_at, updated_at FROM cars WHERE id = $1 FOR UPDATE`
+	query := `SELECT id, name, availability, stock_availability, rental_costs, category, COALESCE(description, ''), COALESCE(image_url, ''), created_at, updated_at FROM cars WHERE id = $1 FOR UPDATE`
 	car := &model.Car{}
 	err := r.getQuerier().QueryRow(ctx, query, id).Scan(&car.ID, &car.Name, &car.Availability, &car.StockAvailability, &car.RentalCosts, &car.Category, &car.Description, &car.ImageURL, &car.CreatedAt, &car.UpdatedAt)
 	if err != nil {

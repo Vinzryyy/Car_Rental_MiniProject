@@ -52,7 +52,7 @@ func (r *rentalRepository) Create(ctx context.Context, rental *model.RentalHisto
 }
 
 func (r *rentalRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.RentalHistory, error) {
-	query := `SELECT id, user_id, car_id, rental_date, return_date, total_cost, status, payment_status, payment_url, created_at, updated_at FROM rental_histories WHERE id = $1`
+	query := `SELECT id, user_id, car_id, rental_date, return_date, total_cost, status, payment_status, COALESCE(payment_url, ''), created_at, updated_at FROM rental_histories WHERE id = $1`
 	rental := &model.RentalHistory{}
 	err := r.getQuerier().QueryRow(ctx, query, id).Scan(&rental.ID, &rental.UserID, &rental.CarID, &rental.RentalDate, &rental.ReturnDate, &rental.TotalCost, &rental.Status, &rental.PaymentStatus, &rental.PaymentURL, &rental.CreatedAt, &rental.UpdatedAt)
 	if err != nil {
@@ -62,7 +62,7 @@ func (r *rentalRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Re
 }
 
 func (r *rentalRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]model.RentalHistory, error) {
-	query := `SELECT id, user_id, car_id, rental_date, return_date, total_cost, status, payment_status, payment_url, created_at, updated_at FROM rental_histories WHERE user_id = $1 ORDER BY created_at DESC`
+	query := `SELECT id, user_id, car_id, rental_date, return_date, total_cost, status, payment_status, COALESCE(payment_url, ''), created_at, updated_at FROM rental_histories WHERE user_id = $1 ORDER BY created_at DESC`
 	rows, err := r.getQuerier().Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (r *rentalRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([
 }
 
 func (r *rentalRepository) GetByUserIDWithCarDetails(ctx context.Context, userID uuid.UUID) ([]model.RentalWithCarDetails, error) {
-	query := `SELECT rh.id, rh.user_id, rh.car_id, rh.rental_date, rh.return_date, rh.total_cost, rh.status, rh.payment_status, rh.payment_url, rh.created_at, rh.updated_at, c.name as car_name 
+	query := `SELECT rh.id, rh.user_id, rh.car_id, rh.rental_date, rh.return_date, rh.total_cost, rh.status, rh.payment_status, COALESCE(rh.payment_url, ''), rh.created_at, rh.updated_at, c.name as car_name 
 			  FROM rental_histories rh 
 			  JOIN cars c ON rh.car_id = c.id 
 			  WHERE rh.user_id = $1 ORDER BY rh.created_at DESC`

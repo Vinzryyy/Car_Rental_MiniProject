@@ -48,7 +48,7 @@ func (r *topUpRepository) Create(ctx context.Context, transaction *model.TopUpTr
 }
 
 func (r *topUpRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.TopUpTransaction, error) {
-	query := `SELECT id, user_id, amount, status, payment_method, payment_url, created_at, updated_at FROM top_up_transactions WHERE id = $1`
+	query := `SELECT id, user_id, amount, status, COALESCE(payment_method, ''), COALESCE(payment_url, ''), created_at, updated_at FROM top_up_transactions WHERE id = $1`
 	transaction := &model.TopUpTransaction{}
 	err := r.getQuerier().QueryRow(ctx, query, id).Scan(&transaction.ID, &transaction.UserID, &transaction.Amount, &transaction.Status, &transaction.PaymentMethod, &transaction.PaymentURL, &transaction.CreatedAt, &transaction.UpdatedAt)
 	if err != nil {
@@ -58,7 +58,7 @@ func (r *topUpRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Top
 }
 
 func (r *topUpRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]model.TopUpTransaction, error) {
-	query := `SELECT id, user_id, amount, status, payment_method, payment_url, created_at, updated_at FROM top_up_transactions WHERE user_id = $1 ORDER BY created_at DESC`
+	query := `SELECT id, user_id, amount, status, COALESCE(payment_method, ''), COALESCE(payment_url, ''), created_at, updated_at FROM top_up_transactions WHERE user_id = $1 ORDER BY created_at DESC`
 	rows, err := r.getQuerier().Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
