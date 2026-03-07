@@ -65,6 +65,9 @@ func Initialize(cfg *config.DatabaseConfig) (*Database, error) {
 		return nil, fmt.Errorf("unable to parse database config: %w", err)
 	}
 
+	// For Supabase/PGBouncer: Use simple protocol to avoid prepared statement issues
+	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
 	// Create a context with timeout for initialization
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
