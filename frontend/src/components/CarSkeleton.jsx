@@ -1,5 +1,3 @@
-import React from 'react';
-
 const CarSkeleton = () => {
   return (
     <div className="bg-dark-card rounded-2xl overflow-hidden border border-white/5 shadow-xl">

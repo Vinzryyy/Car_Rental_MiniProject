@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { Car, Search, Fuel, MapPin } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -10,12 +11,9 @@ const CarList = () => {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchCars();
-  }, [category]);
-
-  const fetchCars = async () => {
+  const fetchCars = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -25,12 +23,17 @@ const CarList = () => {
       };
       const response = await api.get('/cars', { params });
       setCars(response.data.data.cars);
-    } catch (err) {
+      setError('');
+    } catch {
       setError('Failed to fetch cars');
     } finally {
       setLoading(false);
     }
-  };
+  }, [category, search]);
+
+  useEffect(() => {
+    fetchCars();
+  }, [fetchCars]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -151,7 +154,7 @@ const CarList = () => {
                     <span className="text-gray-600 text-xs font-bold block">/ DAY</span>
                   </div>
                   <button 
-                    onClick={() => window.location.href = `/cars/${car.id}`}
+                    onClick={() => navigate(`/cars/${car.id}`)}
                     className="bg-white/5 border border-white/10 text-white hover:bg-primary hover:border-primary px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg active:scale-95"
                   >
                     Details

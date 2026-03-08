@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
@@ -13,22 +13,22 @@ const CarDetail = () => {
   const [days, setDays] = useState(1);
   const [loading, setLoading] = useState(true);
   const [renting, setRenting] = useState(false);
-  const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchCarDetails();
-  }, [id]);
-
-  const fetchCarDetails = async () => {
+  const fetchCarDetails = useCallback(async () => {
     try {
+      setLoading(true);
       const response = await api.get(`/cars/${id}`);
       setCar(response.data.data);
-    } catch (err) {
-      setError('Car not found');
+    } catch {
+      toast.error('Car not found');
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchCarDetails();
+  }, [fetchCarDetails]);
 
   const handleRent = async () => {
     if (!user) {

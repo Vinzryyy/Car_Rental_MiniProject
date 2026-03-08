@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
 import api from '../api/axios';
 
@@ -7,6 +7,12 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+  }, []);
 
   useEffect(() => {
     // Initialize user state from localStorage on startup
@@ -24,12 +30,12 @@ export const AuthProvider = ({ children }) => {
         } else {
           setUser(JSON.parse(storedUser));
         }
-      } catch (error) {
+      } catch {
         logout();
       }
     }
     setLoading(false);
-  }, []);
+  }, [logout]);
 
   const login = async (email, password) => {
     try {
@@ -60,12 +66,6 @@ export const AuthProvider = ({ children }) => {
         errors: error.response?.data?.errors
       };
     }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
   };
 
   const refreshUserData = async () => {

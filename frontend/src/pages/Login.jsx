@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, LogIn } from 'lucide-react';
@@ -77,7 +77,7 @@ const Login = () => {
         </form>
 
         <div className="mt-8 text-center text-sm text-gray-500">
-          Don't have an account? <Link to="/register" className="text-primary font-semibold hover:underline">Register now</Link>
+          Don&apos;t have an account? <Link to="/register" className="text-primary font-semibold hover:underline">Register now</Link>
         </div>
       </div>
     </div>

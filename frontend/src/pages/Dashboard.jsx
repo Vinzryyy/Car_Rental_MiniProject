@@ -1,24 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Wallet, Clock, CheckCircle, AlertCircle, ExternalLink, Plus } from 'lucide-react';
+import { Wallet, Clock, ExternalLink, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Dashboard = () => {
   const { user, refreshUserData } = useAuth();
   const [rentals, setRentals] = useState([]);
   const [topups, setTopups] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [topUpAmount, setTopUpAmount] = useState('');
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
-      setLoading(true);
       const [rentalsRes, topupsRes] = await Promise.all([
         api.get('/rentals/my'),
         api.get('/topup/history')
@@ -26,12 +20,14 @@ const Dashboard = () => {
       setRentals(rentalsRes.data.data || []);
       setTopups(topupsRes.data.data || []);
       await refreshUserData();
-    } catch (err) {
+    } catch {
       toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [refreshUserData]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const handleTopUp = async (e) => {
     e.preventDefault();
@@ -44,7 +40,7 @@ const Dashboard = () => {
         setTopUpAmount('');
         toast.success('Payment link opened! Please complete payment.');
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to initiate top-up');
     }
   };
