@@ -1,0 +1,79 @@
+.skeleton-card {
+  border-color: #333;
+  background-color: #1a1a1a;
+}
+
+.skeleton-image {
+  height: 200px;
+  width: 100%;
+  background-color: #2a2a2a;
+}
+
+.skeleton-info {
+  padding: 1.5rem;
+}
+
+.skeleton-title {
+  height: 24px;
+  width: 60%;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.skeleton-specs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.skeleton-spec {
+  height: 16px;
+  width: 30%;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+}
+
+.skeleton-desc {
+  height: 14px;
+  width: 100%;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.skeleton-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #333;
+  padding-top: 1.2rem;
+  margin-top: 1.5rem;
+}
+
+.skeleton-price {
+  height: 24px;
+  width: 40%;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+}
+
+.skeleton-btn {
+  height: 36px;
+  width: 100px;
+  background-color: #2a2a2a;
+  border-radius: 6px;
+}
+
+.pulse {
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

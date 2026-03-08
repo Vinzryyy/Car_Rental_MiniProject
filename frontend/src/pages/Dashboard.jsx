@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 import { Wallet, CreditCard, Clock, CheckCircle, AlertCircle, ExternalLink, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -27,6 +28,7 @@ const Dashboard = () => {
       setTopups(topupsRes.data.data || []);
       await refreshUserData();
     } catch (err) {
+      toast.error('Failed to load dashboard data');
       console.error('Failed to fetch dashboard data', err);
     } finally {
       setLoading(false);
@@ -42,11 +44,10 @@ const Dashboard = () => {
         window.open(payment_url, '_blank');
         setIsTopUpModalOpen(false);
         setTopUpAmount('');
-        // Alert user to refresh after payment
-        alert('Payment link opened in new tab. Please refresh dashboard after completing payment.');
+        toast.success('Payment link opened! Please complete payment.');
       }
     } catch (err) {
-      alert('Failed to initiate top-up');
+      toast.error('Failed to initiate top-up');
     }
   };
 

@@ -2,26 +2,26 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, LogIn } from 'lucide-react';
+import { toast } from 'sonner';
 import './Auth.css';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
     const result = await login(email, password);
     if (result.success) {
+      toast.success('Welcome back!');
       navigate('/dashboard');
     } else {
-      setError(result.message);
+      toast.error(result.message || 'Invalid email or password');
     }
     setLoading(false);
   };
@@ -34,8 +34,6 @@ const Login = () => {
           <h1>Welcome Back</h1>
           <p>Login to your Vinz Rental account</p>
         </div>
-
-        {error && <div className="auth-error">{error}</div>}
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">

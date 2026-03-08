@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CarDetail from './pages/CarDetail';
+import { Toaster } from 'sonner';
 import './App.css';
 
 // Protected Route component
@@ -22,6 +23,7 @@ const ProtectedRoute = ({ children }) => {
 function AppContent() {
   return (
     <div className="app">
+      <Toaster position="top-right" richColors theme="dark" />
       <Navbar />
       <main className="main-content">
         <Routes>

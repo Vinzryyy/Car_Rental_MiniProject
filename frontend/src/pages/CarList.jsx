@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Car, Search, Filter, Fuel, Users, MapPin, Loader } from 'lucide-react';
+import { Car, Search, Filter, Fuel, Users, MapPin } from 'lucide-react';
+import { motion } from 'framer-motion';
+import CarSkeleton from '../components/CarSkeleton';
 import './CarList.css';
 
 const CarList = () => {
@@ -36,20 +38,32 @@ const CarList = () => {
     fetchCars();
   };
 
-  if (loading && cars.length === 0) {
-    return (
-      <div className="loading-container">
-        <Loader className="spinner" size={48} />
-        <p>Loading premium cars...</p>
-      </div>
-    );
-  }
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
 
   return (
     <div className="car-list-container">
       <section className="hero">
-        <h1>Premium Car Rental</h1>
-        <p>Drive your dream car today with our easy and affordable rental service.</p>
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <h1>Premium Car Rental</h1>
+          <p>Drive your dream car today with our easy and affordable rental service.</p>
+        </motion.div>
       </section>
 
       <div className="filter-bar">
@@ -94,33 +108,46 @@ const CarList = () => {
 
       {error && <div className="error-message">{error}</div>}
 
-      <div className="car-grid">
-        {cars.map((car) => (
-          <div key={car.id} className="car-card">
-            <div className="car-image">
-              <img src={car.image_url || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800'} alt={car.name} />
-              <div className="car-category">{car.category}</div>
-            </div>
-            <div className="car-info">
-              <h3>{car.name}</h3>
-              <div className="car-specs">
-                <span><MapPin size={14} /> Jakarta</span>
-                <span><Fuel size={14} /> Hybrid</span>
+      {loading ? (
+        <div className="car-grid">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <CarSkeleton key={n} />
+          ))}
+        </div>
+      ) : (
+        <motion.div 
+          className="car-grid"
+          variants={container}
+          initial="hidden"
+          animate="show"
+        >
+          {cars.map((car) => (
+            <motion.div key={car.id} className="car-card" variants={item}>
+              <div className="car-image">
+                <img src={car.image_url || 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800'} alt={car.name} />
+                <div className="car-category">{car.category}</div>
               </div>
-              <p className="car-description">{car.description}</p>
-              <div className="car-footer">
-                <div className="car-price">
-                  <span className="amount">IDR {car.rental_costs?.toLocaleString()}</span>
-                  <span className="unit">/day</span>
+              <div className="car-info">
+                <h3>{car.name}</h3>
+                <div className="car-specs">
+                  <span><MapPin size={14} /> Jakarta</span>
+                  <span><Fuel size={14} /> Hybrid</span>
                 </div>
-                <button className="rent-btn" onClick={() => window.location.href = `/cars/${car.id}`}>
-                  View Details
-                </button>
+                <p className="car-description">{car.description}</p>
+                <div className="car-footer">
+                  <div className="car-price">
+                    <span className="amount">IDR {car.rental_costs?.toLocaleString()}</span>
+                    <span className="unit">/day</span>
+                  </div>
+                  <button className="rent-btn" onClick={() => window.location.href = `/cars/${car.id}`}>
+                    View Details
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
 
       {cars.length === 0 && !loading && (
         <div className="no-results">
