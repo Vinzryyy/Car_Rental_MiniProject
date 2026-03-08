@@ -72,8 +72,9 @@ type TopUpRequest struct {
 // RentCarRequest represents the car rental request
 // @Description Request to rent a car
 type RentCarRequest struct {
-	CarID      uuid.UUID `json:"car_id" validate:"required,uuid"`
-	RentalDays int       `json:"rental_days" validate:"required,gt=0"`
+	CarID     uuid.UUID `json:"car_id" validate:"required,uuid"`
+	StartDate string    `json:"start_date" validate:"required"`
+	EndDate   string    `json:"end_date" validate:"required"`
 }
 
 // UpdateCarRequest represents the car update request

@@ -55,6 +55,26 @@ func NewRentalService(pool repository.DBPool, rentalRepo repository.RentalReposi
 }
 
 func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.RentCarRequest) (*model.RentalHistory, error) {
+	// Parse dates
+	startDate, err := time.Parse("2006-01-02", req.StartDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start date format")
+	}
+	endDate, err := time.Parse("2006-01-02", req.EndDate)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end date format")
+	}
+
+	if endDate.Before(startDate) || endDate.Equal(startDate) {
+		return nil, fmt.Errorf("end date must be after start date")
+	}
+
+	// Calculate days
+	rentalDays := int(endDate.Sub(startDate).Hours() / 24)
+	if rentalDays <= 0 {
+		rentalDays = 1
+	}
+
 	// Start transaction
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -79,7 +99,7 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 	}
 
 	// Calculate total cost
-	totalCost := car.RentalCosts * float64(req.RentalDays)
+	totalCost := car.RentalCosts * float64(rentalDays)
 
 	// Get user details
 	user, err := userRepoTx.GetByID(ctx, userID)
@@ -87,26 +107,18 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 		return nil, ErrUserNotFound
 	}
 
-	// Note: We no longer fail here if deposit is insufficient.
-	// Instead, we allow the rental to be created as 'pending' 
-	// and the user can pay via the generated Xendit payment link.
-	// If they want to use deposit, they can call ConfirmPayment later.
-
 	// Decrease car stock
 	if err := carRepoTx.DecreaseStock(ctx, req.CarID); err != nil {
 		return nil, ErrCarNotAvailable
 	}
-
-	// Calculate return date
-	returnDate := time.Now().Add(time.Duration(req.RentalDays) * 24 * time.Hour)
 
 	// Create rental record
 	rental := &model.RentalHistory{
 		ID:            uuid.New(),
 		UserID:        userID,
 		CarID:         req.CarID,
-		RentalDate:    time.Now(),
-		ReturnDate:    &returnDate,
+		RentalDate:    startDate,
+		ReturnDate:    &endDate,
 		TotalCost:     totalCost,
 		Status:        "pending",
 		PaymentStatus: "pending",
@@ -128,15 +140,15 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 	
 	// Generate payment invoice URL using Xendit
 	orderID := fmt.Sprintf("RENTAL-%s", rental.ID.String())
-	description := fmt.Sprintf("Car rental payment for %s", car.Name)
+	description := fmt.Sprintf("Car rental payment for %s (%d days)", car.Name, rentalDays)
 	paymentURL, err := s.paymentService.CreateInvoice(context.Background(), orderID, totalCost, user.Email, description)
 	if err == nil && paymentURL != "" {
-		// Update rental with payment URL (outside transaction is fine here)
+		// Update rental with payment URL
 		rental.PaymentURL = paymentURL
 		_ = s.rentalRepo.UpdatePaymentURL(context.Background(), rental.ID, paymentURL)
 	}
 
-	// Send booking confirmation email (non-blocking)
+	// Send booking confirmation email
 	if s.emailService != nil && s.emailService.IsEnabled() {
 		go func() {
 			_ = s.emailService.SendBookingConfirmationEmail(
@@ -144,7 +156,7 @@ func (s *rentalService) RentCar(ctx context.Context, userID uuid.UUID, req dto.R
 				user.Email,
 				user.Email,
 				car.Name,
-				time.Now().Format("2006-01-02"),
+				startDate.Format("2006-01-02"),
 				totalCost,
 				paymentURL,
 			)
