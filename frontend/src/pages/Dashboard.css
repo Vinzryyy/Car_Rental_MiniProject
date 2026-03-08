@@ -1,0 +1,232 @@
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.dashboard-header {
+  margin-bottom: 3rem;
+  text-align: left;
+}
+
+.dashboard-header h1 {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-header p {
+  color: #888;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.stat-card {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+}
+
+.stat-card.balance {
+  border-color: #646cff;
+  background: linear-gradient(145deg, #1a1a1a, #252525);
+}
+
+.stat-icon {
+  background-color: rgba(100, 108, 255, 0.1);
+  color: #646cff;
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #888;
+  margin-bottom: 0.2rem;
+}
+
+.stat-value {
+  margin: 0;
+  font-size: 1.8rem;
+  color: white;
+}
+
+.add-funds-btn {
+  position: absolute;
+  right: 2rem;
+  background-color: #646cff;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dashboard-content {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+.section {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: white;
+}
+
+.table-container {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.data-table th {
+  background-color: #252525;
+  padding: 1rem 1.5rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #666;
+  font-weight: 600;
+}
+
+.data-table td {
+  padding: 1.2rem 1.5rem;
+  border-bottom: 1px solid #252525;
+  color: #ccc;
+  font-size: 0.95rem;
+}
+
+.empty-row {
+  text-align: center;
+  padding: 3rem ! from;
+  color: #666;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.badge.pending { background-color: rgba(255, 165, 0, 0.1); color: #ffa500; }
+.badge.active { background-color: rgba(76, 175, 80, 0.1); color: #4caf50; }
+.badge.completed { background-color: rgba(33, 150, 243, 0.1); color: #2196f3; }
+.badge.cancelled { background-color: rgba(244, 67, 54, 0.1); color: #f44336; }
+.badge.overdue { background-color: rgba(244, 67, 54, 0.2); color: #ff5252; border: 1px solid rgba(244, 67, 54, 0.3); }
+
+.pay-link {
+  color: #646cff;
+  text-decoration: none;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pay-link:hover {
+  text-decoration: underline;
+}
+
+/* Modal Styling */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background-color: #1a1a1a;
+  padding: 2.5rem;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  border: 1px solid #333;
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  color: white;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: 0.8rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancel-btn {
+  background-color: transparent;
+  border: 1px solid #333;
+  color: #ccc;
+}
+
+.confirm-btn {
+  background-color: #646cff;
+  border: none;
+  color: white;
+}
