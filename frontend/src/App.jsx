@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CarDetail from './pages/CarDetail';
+import AdminDashboard from './pages/AdminDashboard';
 import { Toaster } from 'sonner';
 import './App.css';
 
@@ -20,6 +21,21 @@ const ProtectedRoute = ({ children }) => {
   );
   
   if (!user) return <Navigate to="/login" />;
+  
+  return children;
+};
+
+// Admin Route component
+const AdminRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-dark">
+      <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+  
+  if (!user || user.role !== 'admin') return <Navigate to="/" />;
   
   return children;
 };
@@ -41,6 +57,14 @@ function AppContent() {
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
             } 
           />
         </Routes>
