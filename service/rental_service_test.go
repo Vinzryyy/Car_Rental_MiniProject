@@ -243,8 +243,9 @@ func TestRentalService_RentCar(t *testing.T) {
 		userID := uuid.New()
 		carID := uuid.New()
 		req := dto.RentCarRequest{
-			CarID:      carID,
-			RentalDays: 2,
+			CarID:     carID,
+			StartDate: "2026-03-10",
+			EndDate:   "2026-03-12", // 2 days
 		}
 
 		car := &model.Car{
@@ -300,7 +301,11 @@ func TestRentalService_RentCar(t *testing.T) {
 
 		userID := uuid.New()
 		carID := uuid.New()
-		req := dto.RentCarRequest{CarID: carID, RentalDays: 1}
+		req := dto.RentCarRequest{
+			CarID:     carID,
+			StartDate: "2026-03-10",
+			EndDate:   "2026-03-11",
+		}
 
 		car := &model.Car{ID: carID, Availability: false, StockAvailability: 0}
 
@@ -333,7 +338,11 @@ func TestRentalService_RentCar(t *testing.T) {
 
 		userID := uuid.New()
 		carID := uuid.New()
-		req := dto.RentCarRequest{CarID: carID, RentalDays: 5}
+		req := dto.RentCarRequest{
+			CarID:     carID,
+			StartDate: "2026-03-10",
+			EndDate:   "2026-03-15", // 5 days
+		}
 
 		car := &model.Car{ID: carID, Name: "Expensive Car", Availability: true, StockAvailability: 5, RentalCosts: 100.00}
 		user := &model.User{ID: userID, Email: "poor@example.com", DepositAmount: 50.00}
