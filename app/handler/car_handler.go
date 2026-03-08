@@ -106,6 +106,8 @@ func (h *CarHandler) GetAllCars(c echo.Context) error {
 	search := c.QueryParam("search")
 	sortBy := c.QueryParam("sort_by")
 	sortOrder := c.QueryParam("sort_order")
+	minPrice, _ := strconv.Atoi(c.QueryParam("min_price"))
+	maxPrice, _ := strconv.Atoi(c.QueryParam("max_price"))
 	
 	limit, _ := strconv.Atoi(c.QueryParam("limit"))
 	offset, _ := strconv.Atoi(c.QueryParam("offset"))
@@ -116,6 +118,8 @@ func (h *CarHandler) GetAllCars(c echo.Context) error {
 		Category:      category,
 		AvailableOnly: availableOnly,
 		Search:        search,
+		MinPrice:      minPrice,
+		MaxPrice:      maxPrice,
 		SortBy:        sortBy,
 		SortOrder:     sortOrder,
 		Limit:         limit,

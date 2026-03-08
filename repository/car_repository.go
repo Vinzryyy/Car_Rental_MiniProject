@@ -89,13 +89,16 @@ func (r *carRepository) GetAll(ctx context.Context, filter CarFilter) ([]model.C
 		argIndex++
 	}
 
-	countQuery += whereClause
-	dataQuery += whereClause
+	// Calculate total count first
+	var total int
+	err := r.getQuerier().QueryRow(ctx, countQuery+whereClause, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	// Sorting
 	sortBy := "created_at"
 	if filter.SortBy != "" {
-		// Basic validation to prevent SQL injection (only allow specific columns)
 		allowedSortColumns := map[string]bool{
 			"name":               true,
 			"rental_costs":       true,
@@ -113,7 +116,7 @@ func (r *carRepository) GetAll(ctx context.Context, filter CarFilter) ([]model.C
 		sortOrder = filter.SortOrder
 	}
 
-	dataQuery += fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
+	dataQuery += whereClause + fmt.Sprintf(" ORDER BY %s %s", sortBy, sortOrder)
 
 	// Pagination
 	limit := 10
@@ -128,13 +131,6 @@ func (r *carRepository) GetAll(ctx context.Context, filter CarFilter) ([]model.C
 
 	dataQuery += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIndex, argIndex+1)
 	args = append(args, limit, offset)
-
-	// Get total count
-	var total int
-	err := r.getQuerier().QueryRow(ctx, countQuery, args[:argIndex-1]...).Scan(&total)
-	if err != nil {
-		return nil, 0, err
-	}
 
 	// Get data
 	rows, err := r.getQuerier().Query(ctx, dataQuery, args...)
