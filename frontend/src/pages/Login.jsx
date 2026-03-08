@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
-import './Auth.css';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -27,22 +26,25 @@ const Login = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <LogIn size={40} className="auth-icon" />
-          <h1>Welcome Back</h1>
-          <p>Login to your Vinz Rental account</p>
+    <div className="flex items-center justify-center min-h-[calc(100vh-64px)] p-6">
+      <div className="bg-dark-card w-full max-w-md p-8 rounded-2xl border border-white/5 shadow-2xl">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl mb-4 text-primary">
+            <LogIn size={32} />
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
+          <p className="text-gray-400 font-medium">Login to your Vinz Rental account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-group">
-            <label>Email Address</label>
-            <div className="input-with-icon">
-              <Mail size={18} />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-300">Email Address</label>
+            <div className="relative group">
+              <Mail className="absolute left-3.5 top-3.5 text-gray-500 group-focus-within:text-primary transition-colors" size={18} />
               <input
                 type="email"
                 placeholder="name@example.com"
+                className="w-full bg-black/30 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder:text-gray-600 focus:outline-none focus:border-primary transition-all"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -50,13 +52,14 @@ const Login = () => {
             </div>
           </div>
 
-          <div className="form-group">
-            <label>Password</label>
-            <div className="input-with-icon">
-              <Lock size={18} />
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-300">Password</label>
+            <div className="relative group">
+              <Lock className="absolute left-3.5 top-3.5 text-gray-500 group-focus-within:text-primary transition-colors" size={18} />
               <input
                 type="password"
                 placeholder="••••••••"
+                className="w-full bg-black/30 border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white placeholder:text-gray-600 focus:outline-none focus:border-primary transition-all"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -64,13 +67,17 @@ const Login = () => {
             </div>
           </div>
 
-          <button type="submit" className="auth-submit" disabled={loading}>
+          <button 
+            type="submit" 
+            className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-[0.98]"
+            disabled={loading}
+          >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
-        <div className="auth-footer">
-          Don't have an account? <Link to="/register">Register now</Link>
+        <div className="mt-8 text-center text-sm text-gray-500">
+          Don't have an account? <Link to="/register" className="text-primary font-semibold hover:underline">Register now</Link>
         </div>
       </div>
     </div>

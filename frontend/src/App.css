@@ -1,46 +1,4 @@
-#root {
-  width: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-.app {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  background-color: #0f0f0f;
-  color: #e1e1e1;
-}
-
+/* Global Tailwind-based layouts */
 .main-content {
-  flex: 1;
-  width: 100%;
-}
-
-.footer {
-  background-color: #1a1a1a;
-  padding: 2rem;
-  text-align: center;
-  border-top: 1px solid #333;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.loading-screen {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  font-size: 1.5rem;
-  color: #646cff;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
+  min-height: calc(100vh - 64px - 100px); /* Adjust based on navbar and footer height */
 }
