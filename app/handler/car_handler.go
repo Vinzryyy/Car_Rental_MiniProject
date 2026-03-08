@@ -94,6 +94,8 @@ func (h *CarHandler) UploadCarImage(c echo.Context) error {
 // @Param category query string false "Filter by category"
 // @Param available query bool false "Filter by availability"
 // @Param search query string false "Search by name or description"
+// @Param min_price query int false "Minimum price"
+// @Param max_price query int false "Maximum price"
 // @Param sort_by query string false "Sort by field (name, rental_costs, category, created_at, stock_availability)"
 // @Param sort_order query string false "Sort order (ASC, DESC)"
 // @Param limit query int false "Limit number of results"

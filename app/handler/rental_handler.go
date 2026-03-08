@@ -83,12 +83,6 @@ func (h *RentalHandler) RentCar(c echo.Context) error {
 				Message: "car not available",
 				Error:   err.Error(),
 			})
-		case errors.Is(err, service.ErrInsufficientDeposit):
-			return c.JSON(http.StatusUnprocessableEntity, dto.APIResponse{
-				Success: false,
-				Message: "insufficient deposit. Please top up your balance",
-				Error:   err.Error(),
-			})
 		case errors.Is(err, service.ErrUserNotFound):
 			return c.JSON(http.StatusNotFound, dto.APIResponse{
 				Success: false,

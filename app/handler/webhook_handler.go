@@ -108,24 +108,28 @@ func (h *PaymentWebhookHandler) PaymentNotification(c echo.Context) error {
 		// Send payment confirmation email (non-blocking)
 		if h.emailService != nil && h.emailService.IsEnabled() {
 			go func() {
+				// Use a context with timeout for external API calls
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancel()
+
 				// Fetch user email based on entity type
 				var userEmail string = "customer@example.com"
 				var userName string = "Customer"
 
 				if entityType == "rental" {
-					_, err := h.rentalService.GetRentalByID(context.Background(), entityID)
+					_, err := h.rentalService.GetRentalByID(ctx, entityID)
 					if err == nil {
 						// Here we could ideally fetch the user
 					}
 				} else if entityType == "topup" {
-					_, err := h.topUpService.GetTopUpByID(context.Background(), entityID)
+					_, err := h.topUpService.GetTopUpByID(ctx, entityID)
 					if err == nil {
 						// Similar logic here
 					}
 				}
 
 				_ = h.emailService.SendPaymentConfirmationEmail(
-					context.Background(),
+					ctx,
 					userEmail,
 					userName,
 					notification.OrderID,

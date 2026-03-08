@@ -198,7 +198,22 @@ func (h *AuthHandler) RefreshToken(c echo.Context) error {
 // @Success 200 {object} dto.APIResponse
 // @Router /api/auth/logout [post]
 func (h *AuthHandler) Logout(c echo.Context) error {
-	token := c.Get("token").(string)
+	tokenVal := c.Get("token")
+	if tokenVal == nil {
+		return c.JSON(http.StatusBadRequest, dto.APIResponse{
+			Success: false,
+			Message: "no active session found",
+		})
+	}
+
+	token, ok := tokenVal.(string)
+	if !ok {
+		return c.JSON(http.StatusInternalServerError, dto.APIResponse{
+			Success: false,
+			Message: "invalid session state",
+		})
+	}
+
 	if err := h.authService.Logout(c.Request().Context(), token); err != nil {
 		return c.JSON(http.StatusInternalServerError, dto.APIResponse{
 			Success: false,
