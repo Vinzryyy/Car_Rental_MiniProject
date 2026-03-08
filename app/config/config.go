@@ -47,11 +47,12 @@ type PaymentConfig struct {
 }
 
 type EmailConfig struct {
-	GmailAPIKey            string
+	GmailAPIKey             string
 	GmailServiceAccountJSON string
-	FromEmail              string
-	FromName               string
-	IsEnabled              bool
+	ResendAPIKey            string
+	FromEmail               string
+	FromName                string
+	IsEnabled               bool
 }
 
 func Load() *Config {
@@ -85,6 +86,7 @@ func Load() *Config {
 		Email: EmailConfig{
 			GmailAPIKey:             getEnv("GMAIL_API_KEY", ""),
 			GmailServiceAccountJSON: getEnv("GMAIL_SERVICE_ACCOUNT_JSON", ""),
+			ResendAPIKey:            getEnv("RESEND_API_KEY", ""),
 			FromEmail:               getEnv("SMTP_FROM_EMAIL", "noreply@rentalcar.com"),
 			FromName:                getEnv("EMAIL_FROM_NAME", "Rental Car Service"),
 			IsEnabled:               getEnv("EMAIL_ENABLED", "false") == "true",

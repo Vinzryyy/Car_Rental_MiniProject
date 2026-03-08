@@ -4,28 +4,35 @@ import (
 	"bytes"
 	"context"
 	"embed"
-	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
-	"net/mail"
+	"net/http"
+	"time"
 
 	"car_rental_miniproject/app/config"
-
-	"google.golang.org/api/gmail/v1"
-	"google.golang.org/api/option"
 )
 
 //go:embed templates/emails/*
 var emailTemplates embed.FS
 
-// EmailService handles sending emails via Gmail API
+// EmailService handles sending emails via Resend API
 type EmailService struct {
-	gmailService *gmail.Service
-	fromEmail    string
-	fromName     string
-	isEnabled    bool
-	templates    map[string]*template.Template
+	apiKey    string
+	fromEmail string
+	fromName  string
+	isEnabled bool
+	templates map[string]*template.Template
+	client    *http.Client
+}
+
+// ResendRequest represents the request body for Resend API
+type ResendRequest struct {
+	From    string `json:"from"`
+	To      []string `json:"to"`
+	Subject string   `json:"subject"`
+	Html    string   `json:"html"`
 }
 
 // EmailMessage represents an email message to be sent
@@ -74,9 +81,9 @@ type PasswordResetData struct {
 	ResetLink string
 }
 
-// NewEmailService creates a new Gmail API email service
+// NewEmailService creates a new Resend API email service
 func NewEmailService(cfg *config.Config) *EmailService {
-	// Check if Gmail API is enabled in config
+	// Check if Email is enabled in config
 	if !cfg.Email.IsEnabled {
 		log.Println("Email service is explicitly disabled in config")
 		return &EmailService{
@@ -87,38 +94,20 @@ func NewEmailService(cfg *config.Config) *EmailService {
 		}
 	}
 
-	apiKey := cfg.Email.GmailAPIKey
-	serviceAccount := cfg.Email.GmailServiceAccountJSON
-
-	var gmailSvc *gmail.Service
-	var err error
-	isEnabled := false
-
-	if serviceAccount != "" {
-		log.Println("Initializing Email Service with Service Account...")
-		gmailSvc, err = gmail.NewService(context.Background(), option.WithCredentialsJSON([]byte(serviceAccount)))
-		if err != nil {
-			log.Printf("Failed to initialize Gmail service with Service Account: %v", err)
-		} else {
-			isEnabled = true
-			log.Println("Gmail service initialized successfully with Service Account")
+	apiKey := cfg.Email.ResendAPIKey
+	if apiKey == "" {
+		log.Println("Email enabled but RESEND_API_KEY not found. Service will be disabled.")
+		return &EmailService{
+			isEnabled: false,
+			fromEmail: cfg.Email.FromEmail,
+			fromName:  cfg.Email.FromName,
+			templates: loadEmailTemplates(),
 		}
-	} else if apiKey != "" {
-		log.Println("Initializing Email Service with API Key...")
-		gmailSvc, err = gmail.NewService(context.Background(), option.WithAPIKey(apiKey))
-		if err != nil {
-			log.Printf("Failed to initialize Gmail service with API Key: %v", err)
-		} else {
-			isEnabled = true
-			log.Println("Gmail service initialized successfully with API Key")
-		}
-	} else {
-		log.Println("Email enabled but no Gmail credentials found (API Key or Service Account)")
 	}
 
 	fromEmail := cfg.Email.FromEmail
 	if fromEmail == "" {
-		fromEmail = "noreply@rentalcar.com"
+		fromEmail = "onboarding@resend.dev" // Default Resend test email
 	}
 
 	fromName := cfg.Email.FromName
@@ -126,19 +115,19 @@ func NewEmailService(cfg *config.Config) *EmailService {
 		fromName = "Rental Car Service"
 	}
 
-	// Load email templates
-	templates := loadEmailTemplates()
+	log.Println("Email Service (Resend) initialized successfully")
 
 	return &EmailService{
-		gmailService: gmailSvc,
-		fromEmail:    fromEmail,
-		fromName:     fromName,
-		isEnabled:    isEnabled,
-		templates:    templates,
+		apiKey:    apiKey,
+		fromEmail: fromEmail,
+		fromName:  fromName,
+		isEnabled: true,
+		templates: loadEmailTemplates(),
+		client:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-// loadEmailTemplates loads all email templates from the embedded filesystem
+// loadEmailTemplates remains the same...
 func loadEmailTemplates() map[string]*template.Template {
 	templates := make(map[string]*template.Template)
 	
@@ -154,15 +143,14 @@ func loadEmailTemplates() map[string]*template.Template {
 	for _, file := range templateFiles {
 		content, err := emailTemplates.ReadFile("templates/emails/" + file)
 		if err != nil {
-			continue // Skip if template not found
+			continue
 		}
 
 		tmpl, err := template.New(file).Parse(string(content))
 		if err != nil {
-			continue // Skip if template parsing fails
+			continue
 		}
 
-		// Store template by name (without .html extension)
 		name := file[:len(file)-5]
 		templates[name] = tmpl
 	}
@@ -170,7 +158,6 @@ func loadEmailTemplates() map[string]*template.Template {
 	return templates
 }
 
-// renderTemplate renders a template with the given data
 func (s *EmailService) renderTemplate(name string, data interface{}) (string, error) {
 	tmpl, ok := s.templates[name]
 	if !ok {
@@ -185,70 +172,64 @@ func (s *EmailService) renderTemplate(name string, data interface{}) (string, er
 	return buf.String(), nil
 }
 
-// SendEmail sends an email using Gmail API
+// SendEmail sends an email using Resend API
 func (s *EmailService) SendEmail(ctx context.Context, msg EmailMessage) error {
 	if !s.isEnabled {
-		log.Printf("Email service is disabled. Would have sent email to %s with subject: %s", msg.To, msg.Subject)
+		log.Printf("Email service disabled. Skip sending to %s", msg.To)
 		return nil
 	}
 
-	// Create MIME message
-	var contentType string
-	if msg.IsHTML {
-		contentType = "text/html; charset=utf-8"
-	} else {
-		contentType = "text/plain; charset=utf-8"
+	resendReq := ResendRequest{
+		From:    fmt.Sprintf("%s <%s>", s.fromName, s.fromEmail),
+		To:      []string{msg.To},
+		Subject: msg.Subject,
+		Html:    msg.Body,
 	}
 
-	mime := fmt.Sprintf("From: %s <%s>\r\n", s.fromName, s.fromEmail)
-	mime += fmt.Sprintf("To: %s\r\n", msg.To)
-	mime += fmt.Sprintf("Subject: %s\r\n", msg.Subject)
-	mime += fmt.Sprintf("Content-Type: %s\r\n\r\n", contentType)
-	mime += msg.Body
-
-	// Encode message in base64
-	encodedMessage := base64.URLEncoding.EncodeToString([]byte(mime))
-
-	// Create Gmail message
-	gmailMsg := &gmail.Message{
-		Raw: encodedMessage,
-	}
-
-	// Send via Gmail API
-	res, err := s.gmailService.Users.Messages.Send("me", gmailMsg).Context(ctx).Do()
-	if err != nil {
-		log.Printf("CRITICAL EMAIL ERROR: Failed to send email to %s. Error: %v", msg.To, err)
-		log.Printf("DEBUG INFO: From=%s, FromName=%s, isEnabled=%v", s.fromEmail, s.fromName, s.isEnabled)
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	log.Printf("Email sent successfully to %s. Message ID: %s", msg.To, res.Id)
-	return nil
-}
-
-// SendWelcomeEmail sends a welcome email after user registration
-func (s *EmailService) SendWelcomeEmail(ctx context.Context, toEmail, userName string) error {
-	subject := "Welcome to Rental Car Service!"
-	
-	body, err := s.renderTemplate("welcome", WelcomeEmailData{
-		UserName: userName,
-	})
+	body, err := json.Marshal(resendReq)
 	if err != nil {
 		return err
 	}
 
-	return s.SendEmail(ctx, EmailMessage{
-		To:      toEmail,
-		Subject: subject,
-		Body:    body,
-		IsHTML:  true,
-	})
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.resend.com/emails", bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+s.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Printf("Failed to call Resend API: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		var errResp interface{}
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		log.Printf("Resend API error (Status %d): %v", resp.StatusCode, errResp)
+		return fmt.Errorf("resend api error: status %d", resp.StatusCode)
+	}
+
+	log.Printf("Email sent successfully to %s via Resend", msg.To)
+	return nil
 }
 
-// SendBookingConfirmationEmail sends booking confirmation email
+// SendWelcomeEmail remains the same...
+func (s *EmailService) SendWelcomeEmail(ctx context.Context, toEmail, userName string) error {
+	subject := "Welcome to Rental Car Service!"
+	body, err := s.renderTemplate("welcome", WelcomeEmailData{UserName: userName})
+	if err != nil {
+		return err
+	}
+	return s.SendEmail(ctx, EmailMessage{To: toEmail, Subject: subject, Body: body, IsHTML: true})
+}
+
+// SendBookingConfirmationEmail remains the same...
 func (s *EmailService) SendBookingConfirmationEmail(ctx context.Context, toEmail, userName, carName, rentalDate string, totalCost float64, paymentURL string) error {
 	subject := "Booking Confirmation - " + carName
-	
 	body, err := s.renderTemplate("booking-confirmation", BookingConfirmationData{
 		UserName:   userName,
 		CarName:    carName,
@@ -259,24 +240,16 @@ func (s *EmailService) SendBookingConfirmationEmail(ctx context.Context, toEmail
 	if err != nil {
 		return err
 	}
-
-	return s.SendEmail(ctx, EmailMessage{
-		To:      toEmail,
-		Subject: subject,
-		Body:    body,
-		IsHTML:  true,
-	})
+	return s.SendEmail(ctx, EmailMessage{To: toEmail, Subject: subject, Body: body, IsHTML: true})
 }
 
-// SendPaymentConfirmationEmail sends payment confirmation email
+// SendPaymentConfirmationEmail remains the same...
 func (s *EmailService) SendPaymentConfirmationEmail(ctx context.Context, toEmail, userName, orderID string, amount float64, status string) error {
 	subject := "Payment Confirmation - " + orderID
-	
 	statusColor := "#4CAF50"
 	if status != "completed" && status != "settlement" {
 		statusColor = "#FF9800"
 	}
-	
 	body, err := s.renderTemplate("payment-confirmation", PaymentConfirmationData{
 		UserName:    userName,
 		OrderID:     orderID,
@@ -287,19 +260,11 @@ func (s *EmailService) SendPaymentConfirmationEmail(ctx context.Context, toEmail
 	if err != nil {
 		return err
 	}
-
-	return s.SendEmail(ctx, EmailMessage{
-		To:      toEmail,
-		Subject: subject,
-		Body:    body,
-		IsHTML:  true,
-	})
+	return s.SendEmail(ctx, EmailMessage{To: toEmail, Subject: subject, Body: body, IsHTML: true})
 }
 
-// SendTopUpConfirmationEmail sends deposit top-up confirmation email
 func (s *EmailService) SendTopUpConfirmationEmail(ctx context.Context, toEmail, userName string, amount float64, transactionID string) error {
 	subject := "Deposit Top-Up Confirmation"
-	
 	body, err := s.renderTemplate("topup-confirmation", TopUpConfirmationData{
 		UserName:      userName,
 		Amount:        amount,
@@ -308,19 +273,11 @@ func (s *EmailService) SendTopUpConfirmationEmail(ctx context.Context, toEmail, 
 	if err != nil {
 		return err
 	}
-
-	return s.SendEmail(ctx, EmailMessage{
-		To:      toEmail,
-		Subject: subject,
-		Body:    body,
-		IsHTML:  true,
-	})
+	return s.SendEmail(ctx, EmailMessage{To: toEmail, Subject: subject, Body: body, IsHTML: true})
 }
 
-// SendRentalReminderEmail sends rental reminder email
 func (s *EmailService) SendRentalReminderEmail(ctx context.Context, toEmail, userName, carName, returnDate string) error {
 	subject := "Rental Reminder - Return Your " + carName
-	
 	body, err := s.renderTemplate("rental-reminder", RentalReminderData{
 		UserName:   userName,
 		CarName:    carName,
@@ -329,19 +286,11 @@ func (s *EmailService) SendRentalReminderEmail(ctx context.Context, toEmail, use
 	if err != nil {
 		return err
 	}
-
-	return s.SendEmail(ctx, EmailMessage{
-		To:      toEmail,
-		Subject: subject,
-		Body:    body,
-		IsHTML:  true,
-	})
+	return s.SendEmail(ctx, EmailMessage{To: toEmail, Subject: subject, Body: body, IsHTML: true})
 }
 
-// SendPasswordResetEmail sends password reset email
 func (s *EmailService) SendPasswordResetEmail(ctx context.Context, toEmail, userName, resetLink string) error {
 	subject := "Password Reset Request"
-	
 	body, err := s.renderTemplate("password-reset", PasswordResetData{
 		UserName:  userName,
 		ResetLink: resetLink,
@@ -349,26 +298,13 @@ func (s *EmailService) SendPasswordResetEmail(ctx context.Context, toEmail, user
 	if err != nil {
 		return err
 	}
-
-	return s.SendEmail(ctx, EmailMessage{
-		To:      toEmail,
-		Subject: subject,
-		Body:    body,
-		IsHTML:  true,
-	})
+	return s.SendEmail(ctx, EmailMessage{To: toEmail, Subject: subject, Body: body, IsHTML: true})
 }
 
-// IsEnabled returns true if the email service is configured
 func (s *EmailService) IsEnabled() bool {
 	return s.isEnabled
 }
 
-// GetFromEmail returns the configured from email address
 func (s *EmailService) GetFromEmail() string {
 	return s.fromEmail
-}
-
-// parseEmailAddress validates and parses an email address
-func parseEmailAddress(email string) (*mail.Address, error) {
-	return mail.ParseAddress(email)
 }
