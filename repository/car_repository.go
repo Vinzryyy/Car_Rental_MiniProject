@@ -15,6 +15,8 @@ type CarFilter struct {
 	Category      string
 	AvailableOnly bool
 	Search        string
+	MinPrice      int
+	MaxPrice      int
 	SortBy        string
 	SortOrder     string
 	Limit         int
